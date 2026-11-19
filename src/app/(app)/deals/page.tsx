@@ -1,0 +1,61 @@
+import type { Metadata } from "next";
+import { OperationsWorkspace } from "./operations-workspace";
+import { requireUser } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import { dealStages, type DealStage } from "@/lib/deals";
+import type { DealFilters } from "./filter-controls";
+
+export const metadata: Metadata = { title: "Operations" };
+
+function listParam(value: string | string[] | undefined) {
+  const joined = Array.isArray(value) ? value.join(",") : value;
+  return joined ? joined.split(",").filter(Boolean) : [];
+}
+
+export default async function DealsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const user = await requireUser();
+  const supabase = await createClient();
+  const [dealsResult, configResult] = await Promise.all([
+    supabase.from("deals").select("*").order("updated_at", { ascending: false }),
+    supabase
+      .from("vertical_config")
+      .select("*")
+      .order("sort_order", { ascending: true }),
+  ]);
+
+  if (dealsResult.error) throw new Error(dealsResult.error.message);
+  if (configResult.error) throw new Error(configResult.error.message);
+
+  const { error: activityError } = await supabase.from("activity_log").insert({
+    user_id: user.id,
+    event: "page_view",
+    path: "/deals",
+    detail: { source: "server" },
+  });
+  if (activityError) {
+    console.error("Unable to record the Operations page view.", activityError);
+  }
+
+  return (
+    <OperationsWorkspace
+      initialFilters={{
+        clients: listParam(params.client),
+        verticals: listParam(params.vertical),
+        markets: listParam(params.market),
+        stages: listParam(params.stage).filter((stage): stage is DealStage =>
+          dealStages.includes(stage as DealStage),
+        ),
+        needsReview: params.needsReview === "true",
+        hasAssumptions: params.assumptions === "true",
+      } satisfies DealFilters}
+      initialConfigs={configResult.data}
+      initialDeals={dealsResult.data}
+      user={user}
+    />
+  );
+}

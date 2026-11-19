@@ -1,0 +1,200 @@
+[
+  {
+    "id": "av_clientC_atl:2",
+    "verification_status": "TODO verify",
+    "deal_type": "buy",
+    "negotiated_price": null,
+    "price_context": null,
+    "has_key_date": true,
+    "has_risk": false,
+    "has_next_step": true,
+    "suggested_stage": null
+  },
+  {
+    "id": "av_clientC_atl:3",
+    "verification_status": "TODO verify",
+    "deal_type": "buy",
+    "negotiated_price": 3000000,
+    "price_context": "agreed to $3M",
+    "has_key_date": false,
+    "has_risk": false,
+    "has_next_step": true,
+    "suggested_stage": null
+  },
+  {
+    "id": "av_clientC_atl:4",
+    "verification_status": "TODO verify",
+    "deal_type": "unknown",
+    "negotiated_price": null,
+    "price_context": null,
+    "has_key_date": false,
+    "has_risk": true,
+    "has_next_step": true,
+    "suggested_stage": null
+  },
+  {
+    "id": "av_clientC_atl:5",
+    "verification_status": "TODO verify",
+    "deal_type": "unknown",
+    "negotiated_price": null,
+    "price_context": null,
+    "has_key_date": false,
+    "has_risk": false,
+    "has_next_step": true,
+    "suggested_stage": null
+  },
+  {
+    "id": "av_clientC_atl:6",
+    "verification_status": "TODO verify",
+    "deal_type": "unknown",
+    "negotiated_price": null,
+    "price_context": null,
+    "has_key_date": false,
+    "has_risk": false,
+    "has_next_step": true,
+    "suggested_stage": null
+  },
+  {
+    "id": "av_clientC_atl:7",
+    "verification_status": "TODO verify",
+    "deal_type": "unknown",
+    "negotiated_price": null,
+    "price_context": null,
+    "has_key_date": false,
+    "has_risk": false,
+    "has_next_step": false,
+    "suggested_stage": null
+  },
+  {
+    "id": "food_clientA_nyc:2",
+    "verification_status": "TODO verify",
+    "deal_type": "buy",
+    "negotiated_price": null,
+    "price_context": null,
+    "has_key_date": true,
+    "has_risk": false,
+    "has_next_step": true,
+    "suggested_stage": null
+  },
+  {
+    "id": "food_clientA_nyc:3",
+    "verification_status": "TODO verify",
+    "deal_type": "buy",
+    "negotiated_price": null,
+    "price_context": null,
+    "has_key_date": true,
+    "has_risk": false,
+    "has_next_step": true,
+    "suggested_stage": null
+  },
+  {
+    "id": "food_clientA_nyc:4",
+    "verification_status": "TODO verify",
+    "deal_type": "unknown",
+    "negotiated_price": null,
+    "price_context": null,
+    "has_key_date": false,
+    "has_risk": true,
+    "has_next_step": true,
+    "suggested_stage": null
+  },
+  {
+    "id": "food_clientA_nyc:5",
+    "verification_status": "TODO verify",
+    "deal_type": "buy",
+    "negotiated_price": 3050000,
+    "price_context": "countered at $3.25M, we responded at $3.05M",
+    "has_key_date": false,
+    "has_risk": false,
+    "has_next_step": true,
+    "suggested_stage": null
+  },
+  {
+    "id": "food_clientA_nyc:6",
+    "verification_status": "TODO verify",
+    "deal_type": "buy",
+    "negotiated_price": null,
+    "price_context": "deposit $250,000",
+    "has_key_date": true,
+    "has_risk": false,
+    "has_next_step": true,
+    "suggested_stage": null
+  },
+  {
+    "id": "food_clientA_nyc:7",
+    "verification_status": "TODO verify",
+    "deal_type": "unknown",
+    "negotiated_price": null,
+    "price_context": null,
+    "has_key_date": false,
+    "has_risk": true,
+    "has_next_step": false,
+    "suggested_stage": null
+  },
+  {
+    "id": "food_clientA_nyc:8",
+    "verification_status": "TODO verify",
+    "deal_type": "unknown",
+    "negotiated_price": null,
+    "price_context": null,
+    "has_key_date": false,
+    "has_risk": true,
+    "has_next_step": true,
+    "suggested_stage": null
+  },
+  {
+    "id": "food_clientA_nyc:9",
+    "verification_status": "TODO verify",
+    "deal_type": "lease",
+    "negotiated_price": null,
+    "price_context": "$4M/yr rent, 12 months free rent",
+    "has_key_date": false,
+    "has_risk": true,
+    "has_next_step": true,
+    "suggested_stage": null
+  },
+  {
+    "id": "catering_clientB_jfk:2",
+    "verification_status": "TODO verify",
+    "deal_type": "buy",
+    "negotiated_price": 5750000,
+    "price_context": "best and final $5.75M",
+    "has_key_date": false,
+    "has_risk": false,
+    "has_next_step": true,
+    "suggested_stage": null
+  },
+  {
+    "id": "catering_clientB_jfk:3",
+    "verification_status": "TODO verify",
+    "deal_type": "buy",
+    "negotiated_price": null,
+    "price_context": null,
+    "has_key_date": false,
+    "has_risk": false,
+    "has_next_step": true,
+    "suggested_stage": null
+  },
+  {
+    "id": "catering_clientB_jfk:4",
+    "verification_status": "TODO verify",
+    "deal_type": "buy",
+    "negotiated_price": null,
+    "price_context": null,
+    "has_key_date": false,
+    "has_risk": true,
+    "has_next_step": true,
+    "suggested_stage": null
+  },
+  {
+    "id": "catering_clientB_jfk:5",
+    "verification_status": "TODO verify",
+    "deal_type": "unknown",
+    "negotiated_price": null,
+    "price_context": null,
+    "has_key_date": false,
+    "has_risk": false,
+    "has_next_step": true,
+    "suggested_stage": null
+  }
+]

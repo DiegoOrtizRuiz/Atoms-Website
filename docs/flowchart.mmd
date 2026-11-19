@@ -1,0 +1,16 @@
+flowchart TD
+  A[Messy Google Sheet<br/>tabs per client, different columns,<br/>colored text = assumption] --> B[Audit<br/>13 status spellings, no config tab,<br/>$/SF mismatch, blank vs 0, Metro vs city]
+  B --> C[normalize.py<br/>map by header name, keep raw values,<br/>recompute derived, flag never drop]
+  C --> T{25 tests in CI<br/>rows in = rows out?}
+  T -- fail --> C
+  T -- pass --> D[LLM enrichment<br/>notes -> dates, risks, price context,<br/>weekly note — suggestions only]
+  D --> E[(Supabase cloud Postgres<br/>ONE deals table<br/>history · provenance · RLS · Realtime)]
+  subgraph Vercel[Cloud-hosted Next.js app on Vercel]
+    F[Operations grid<br/>filter · edit · mark/confirm assumptions]
+    G[Weekly Review<br/>by vertical · needs attention ·<br/>present mode · PPTX export]
+    H[User logs & Permissions<br/>roles · online now · usage by person · audit]
+  end
+  E <--> F
+  E <--> G
+  E <--> H
+  I[GitHub push] --> J[CI: pytest · lint · tsc · build] --> K[Vercel deploy<br/>preview per PR · prod on main]
