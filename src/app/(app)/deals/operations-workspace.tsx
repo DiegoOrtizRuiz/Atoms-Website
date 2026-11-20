@@ -287,6 +287,8 @@ export function OperationsWorkspace({
         replaceDeal(result.deal);
         if (result.conflict) {
           toast.error("Someone else edited this deal — reloaded");
+        } else if (result.provenanceKept) {
+          toast.success("Value updated — still marked unconfirmed");
         } else {
           toast.success("Deal saved");
         }

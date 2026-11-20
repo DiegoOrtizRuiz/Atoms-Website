@@ -39,6 +39,7 @@ _Audited the workbook first, wrote a deterministic normalizer with tests before 
 | 7 Admin | | | |
 | 8 Stretch | | | |
 | 9 Cloud import | | | |
+| 10 Review fixes | Fix importer CI, weekly attention dates and new-deal ordering, snapshot permissions, history, deck provenance, typed attributes, and column-level RLS. | Tracked the workbook and removed generated files; added deterministic date extraction and tests; backfilled and preserved deal creation dates; aligned snapshot RLS; added named, quieter history and attribute diffs; unified unconfirmed formatting; validated attribute types and retained provenance; restricted editor columns and renamed the role helper. Applied migration 0004 and reseeded; production RLS and local browser against production data passed. Deployed-site UI verification remains pending: no Vercel login or production URL was available. | Lint, typecheck, 13 web tests, build, and 42 Python tests passed |
 
 ## What I'd do next
 - Two-way Google Sheets sync during migration, then retire the sheet.

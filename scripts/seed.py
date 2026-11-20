@@ -67,6 +67,7 @@ CORE_DEAL_FIELDS = {
     "needs_review",
     "review_reasons",
     "stage_entered_at",
+    "created_at",
 }
 
 
@@ -200,6 +201,7 @@ def prepare_deals(
                 "stage_entered_at": stage_entered_at(source, reference),
             }
         )
+        row["created_at"] = row["stage_entered_at"]
         prepared.append(row)
 
     return prepared
@@ -427,6 +429,18 @@ def upsert_rows(
         )
 
 
+def preserve_deal_creation_dates(
+    deals: list[dict[str, Any]], existing_rows: list[dict[str, Any]]
+) -> None:
+    existing_dates = {
+        row["id"]: row["created_at"]
+        for row in existing_rows
+    }
+    for deal in deals:
+        if deal["id"] in existing_dates:
+            deal["created_at"] = existing_dates[deal["id"]]
+
+
 def seed_users(
     client: Client, specs: list[dict[str, Any]], password: str
 ) -> list[dict[str, Any]]:
@@ -522,6 +536,15 @@ def run() -> None:
 
     client = create_client(url, service_key)
     upsert_rows(client, "vertical_config", vertical_configs(), "tab_prefix")
+    existing_rows = []
+    for offset in range(0, len(deals), 100):
+        ids = [deal["id"] for deal in deals[offset : offset + 100]]
+        existing_rows.extend(
+            response_rows(
+                client.table("deals").select("id, created_at").in_("id", ids).execute()
+            )
+        )
+    preserve_deal_creation_dates(deals, existing_rows)
     upsert_rows(client, "deals", deals, "id")
     upsert_rows(client, "contacts", contacts, "id")
     users = seed_users(client, user_specs, password)

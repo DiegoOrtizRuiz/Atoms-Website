@@ -1,4 +1,11 @@
-import { endOfWeek, isAfter, isBefore, parseISO, startOfWeek, subDays } from "date-fns";
+import {
+  endOfWeek,
+  isAfter,
+  isBefore,
+  parseISO,
+  startOfWeek,
+  subDays,
+} from "date-fns";
 import type { Json } from "@/lib/database.types";
 import {
   dealStages,
@@ -8,6 +15,7 @@ import {
   type DealStage,
   type VerticalConfig,
 } from "@/lib/deals";
+import { extractNoteDates } from "@/lib/note-dates";
 
 export type AttentionItem = {
   id: string;
@@ -29,6 +37,7 @@ export type WeeklyRow = {
   pricePerSf: number | null;
   lotSf: number | null;
   notes: string | null;
+  notesField: "notes" | "weekly_note";
   fieldProvenance: Record<string, Json | undefined>;
   showInWeekly: boolean;
   needsReview: boolean;
@@ -62,6 +71,7 @@ export function buildWeeklyRow(deal: Deal): WeeklyRow {
     pricePerSf: deal.price_per_sf,
     lotSf: deal.lot_sf,
     notes: deal.weekly_note || deal.notes,
+    notesField: deal.weekly_note ? "weekly_note" : "notes",
     fieldProvenance: jsonObject(deal.field_provenance),
     showInWeekly: deal.show_in_weekly,
     needsReview: deal.needs_review,
@@ -75,9 +85,10 @@ function stageRank(stage: DealStage) {
   return Math.max(0, 7 - dealStages.indexOf(stage));
 }
 
-function keyDates(deal: Deal) {
+function keyDates(deal: Deal, reference: Date) {
   const notes = jsonObject(deal.notes_extracted);
-  return Array.isArray(notes.key_dates) ? notes.key_dates : [];
+  const keyDates = Array.isArray(notes.key_dates) ? notes.key_dates : [];
+  return keyDates.length ? keyDates : extractNoteDates(deal.notes, reference);
 }
 
 function attentionFor(
@@ -85,14 +96,16 @@ function attentionFor(
   history: DealHistory[],
   now: Date,
 ): AttentionItem[] {
-  const result: AttentionItem[] = [];
+  const keyDateItems: { item: AttentionItem; date: Date }[] = [];
+  const stageChangeItems: { item: AttentionItem; changedAt: Date }[] = [];
+  const newItems: AttentionItem[] = [];
   const inSevenDays = subDays(now, 7);
   const inFourteenDays = new Date(now);
   inFourteenDays.setDate(inFourteenDays.getDate() + 14);
 
   for (const deal of deals) {
     const title = deal.address || deal.market || deal.vertical || deal.id;
-    for (const rawDate of keyDates(deal)) {
+    for (const rawDate of keyDates(deal, now)) {
       let date: Date | null = null;
       let label = "Key date";
       if (typeof rawDate === "string") {
@@ -100,41 +113,58 @@ function attentionFor(
         if (!Number.isNaN(parsed.getTime())) date = parsed;
       } else if (rawDate && typeof rawDate === "object" && !Array.isArray(rawDate)) {
         const value = rawDate as Record<string, unknown>;
-        const parsed = typeof value.date === "string" ? parseISO(value.date) : null;
+        if ("iso_guess" in value && value.iso_guess === null) continue;
+        const dateValue = "iso_guess" in value ? value.iso_guess : value.date;
+        const parsed = typeof dateValue === "string" ? parseISO(dateValue) : null;
         if (parsed && !Number.isNaN(parsed.getTime())) date = parsed;
         if (typeof value.label === "string") label = value.label;
       }
       if (date && isAfter(date, now) && isBefore(date, inFourteenDays)) {
-        result.push({
-          id: `date:${deal.id}:${date.toISOString()}`,
-          kind: "key_date",
-          label: `${label}: ${date.toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-          })}`,
-          detail: title,
+        keyDateItems.push({
+          item: {
+            id: `date:${deal.id}:${date.toISOString()}`,
+            kind: "key_date",
+            label: `${label}: ${date.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+            })}`,
+            detail: title,
+          },
+          date,
         });
       }
     }
 
-    const recentStage = history.find(
-      (entry) =>
-        entry.deal_id === deal.id &&
-        entry.field === "stage" &&
-        parseISO(entry.changed_at) >= inSevenDays,
-    );
+    const recentStage = history
+      .filter(
+        (entry) =>
+          entry.deal_id === deal.id &&
+          entry.field === "stage" &&
+          parseISO(entry.changed_at) >= inSevenDays,
+      )
+      .sort(
+        (a, b) =>
+          parseISO(b.changed_at).getTime() - parseISO(a.changed_at).getTime(),
+      )[0];
     if (recentStage) {
-      result.push({
-        id: `stage:${deal.id}:${recentStage.id}`,
-        kind: "stage_change",
-        label: `Moved to ${String(recentStage.new_value ?? deal.stage)}`,
-        detail: title,
+      stageChangeItems.push({
+        item: {
+          id: `stage:${deal.id}:${recentStage.id}`,
+          kind: "stage_change",
+          label: `Moved to ${String(recentStage.new_value ?? deal.stage)}`,
+          detail: title,
+        },
+        changedAt: parseISO(recentStage.changed_at),
       });
     }
 
-    const createdAt = parseISO(deal.updated_at);
-    if (deal.version === 1 && createdAt >= inSevenDays) {
-      result.push({
+    const createdAt = parseISO(deal.created_at);
+    if (
+      !Number.isNaN(createdAt.getTime()) &&
+      !isBefore(createdAt, inSevenDays) &&
+      !isAfter(createdAt, now)
+    ) {
+      newItems.push({
         id: `new:${deal.id}`,
         kind: "new",
         label: "New to pipeline",
@@ -143,7 +173,15 @@ function attentionFor(
     }
   }
 
-  return result.slice(0, 12);
+  keyDateItems.sort((a, b) => a.date.getTime() - b.date.getTime());
+  stageChangeItems.sort(
+    (a, b) => b.changedAt.getTime() - a.changedAt.getTime(),
+  );
+  return [
+    ...keyDateItems.map(({ item }) => item),
+    ...stageChangeItems.map(({ item }) => item),
+    ...newItems,
+  ].slice(0, 12);
 }
 
 export function buildWeeklyModel(

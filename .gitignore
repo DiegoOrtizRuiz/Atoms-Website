@@ -13,7 +13,12 @@
 # testing
 /coverage
 /data/
+!/data/src.xlsx
 /out/
+__pycache__/
+*.pyc
+supabase/.temp/
+.venv/
 
 # next.js
 /.next/

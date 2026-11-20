@@ -52,6 +52,10 @@ export function jsonObject(value: Json | null | undefined) {
     : {};
 }
 
+export function isUnconfirmed(status: unknown): boolean {
+  return status === "assumed" || status === "llm_suggested";
+}
+
 export function provenanceFor(
   deal: Deal,
   field: string,

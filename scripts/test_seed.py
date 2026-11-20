@@ -8,6 +8,7 @@ from seed import (
     demo_users,
     prepare_deals,
     prepare_contacts,
+    preserve_deal_creation_dates,
 )
 
 
@@ -67,6 +68,19 @@ def test_prepare_deals_backdates_days_on_market(deals):
 
     assert prepared[2]["stage_entered_at"] == "2026-11-07T12:00:00+00:00"
     assert prepared[0]["stage_entered_at"] == "2026-11-19T12:00:00+00:00"
+    assert prepared[2]["created_at"] == prepared[2]["stage_entered_at"]
+    assert prepared[0]["created_at"] == prepared[0]["stage_entered_at"]
+
+
+def test_seed_preserves_existing_deal_creation_dates(deals):
+    prepared = prepare_deals(deals, datetime(2026, 11, 19, 12, tzinfo=UTC))
+    preserve_deal_creation_dates(
+        prepared,
+        [{"id": prepared[2]["id"], "created_at": "2025-01-01T00:00:00+00:00"}],
+    )
+
+    assert prepared[2]["created_at"] == "2025-01-01T00:00:00+00:00"
+    assert prepared[0]["created_at"] == prepared[0]["stage_entered_at"]
 
 
 def test_demo_users_have_expected_role_counts_and_named_accounts(deals):

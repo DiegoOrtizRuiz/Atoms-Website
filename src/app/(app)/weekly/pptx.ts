@@ -1,6 +1,7 @@
 "use client";
 
 import PptxGenJS from "pptxgenjs";
+import { isUnconfirmed } from "@/lib/deals";
 import type { WeeklyModel, WeeklyRow } from "@/lib/weekly";
 import { fmtMoney, fmtNumber } from "@/lib/format";
 
@@ -23,25 +24,34 @@ function compactMoney(value: number | null) {
 
 function tableRow(row: WeeklyRow) {
   return [
-    { text: row.market || "—" },
+    {
+      text: row.market || "—",
+      options: { italic: isUnconfirmed(row.fieldProvenance.market) },
+    },
     {
       text: [row.address || "—", row.location].filter(Boolean).join("\n"),
-      options: { italic: Boolean(row.fieldProvenance.address) },
+      options: { italic: isUnconfirmed(row.fieldProvenance.address) },
     },
     {
       text: row.stage,
-      options: { italic: Boolean(row.fieldProvenance.stage) },
+      options: { italic: isUnconfirmed(row.fieldProvenance.stage) },
     },
     {
       text: compactMoney(row.listPrice),
-      options: { italic: Boolean(row.fieldProvenance.list_price) },
+      options: { italic: isUnconfirmed(row.fieldProvenance.list_price) },
     },
-    { text: fmtNumber(row.buildingSf) },
+    {
+      text: fmtNumber(row.buildingSf),
+      options: { italic: isUnconfirmed(row.fieldProvenance.bldg_sf) },
+    },
     { text: row.pricePerSf == null ? "—" : `$${row.pricePerSf}/SF` },
-    { text: fmtNumber(row.lotSf) },
+    {
+      text: fmtNumber(row.lotSf),
+      options: { italic: isUnconfirmed(row.fieldProvenance.lot_sf) },
+    },
     {
       text: row.notes || "—",
-      options: { italic: Boolean(row.fieldProvenance.weekly_note) },
+      options: { italic: isUnconfirmed(row.fieldProvenance[row.notesField]) },
     },
   ];
 }

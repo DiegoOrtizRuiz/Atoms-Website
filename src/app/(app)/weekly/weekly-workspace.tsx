@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { CurrentUser } from "@/lib/auth";
 import type { Json } from "@/lib/database.types";
-import type { Deal, DealHistory, VerticalConfig } from "@/lib/deals";
+import { isUnconfirmed, type Deal, type DealHistory, type VerticalConfig } from "@/lib/deals";
 import { fmtMoney, fmtNumber, fmtOrDash } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -68,8 +68,7 @@ function WeeklyCell({
   className?: string;
 }) {
   const provenance = row.fieldProvenance[field];
-  const highlighted =
-    provenance === "assumed" || provenance === "llm_suggested";
+  const highlighted = isUnconfirmed(provenance);
   return (
     <span
       className={`${className} ${
@@ -205,7 +204,7 @@ function WeeklySectionTable({
                   </WeeklyCell>
                 </td>
                 <td className={`min-w-72 px-4 leading-6 text-slate-600 ${presentation ? "py-6" : "py-4"}`}>
-                  <WeeklyCell row={row} field="weekly_note">
+                  <WeeklyCell row={row} field={row.notesField}>
                     {fmtOrDash(row.notes)}
                   </WeeklyCell>
                 </td>

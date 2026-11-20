@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { fmtDate, fmtMoney, fmtNumber, fmtOrDash } from "@/lib/format";
 import type { Deal, DealHistory } from "@/lib/deals";
+import type { Database } from "@/lib/database.types";
+import { expandHistoryEntry } from "@/lib/history";
 import { loadDealHistory } from "./actions";
 
 function valueText(value: unknown) {
@@ -24,16 +26,23 @@ export function DealDrawer({
   onOpenChange: (open: boolean) => void;
 }) {
   const [history, setHistory] = useState<DealHistory[]>([]);
+  const [authors, setAuthors] = useState<
+    Database["public"]["Views"]["profile_names"]["Row"][]
+  >([]);
   const [historyError, setHistoryError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !deal) return;
     let active = true;
     setHistory([]);
+    setAuthors([]);
     setHistoryError(null);
     loadDealHistory(deal.id)
-      .then((rows) => {
-        if (active) setHistory(rows);
+      .then((result) => {
+        if (active) {
+          setHistory(result.entries.flatMap(expandHistoryEntry));
+          setAuthors(result.authors);
+        }
       })
       .catch((error) => {
         if (active) {
@@ -176,7 +185,10 @@ export function DealDrawer({
             </div>
           </section>
 
-          <section className="space-y-4">
+          <details className="space-y-4">
+            <summary className="cursor-pointer text-sm font-medium text-slate-700">
+              Technical details
+            </summary>
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
               Raw source
             </h3>
@@ -193,11 +205,16 @@ export function DealDrawer({
               )}
             </pre>
             {extracted ? (
-              <pre className="overflow-x-auto rounded-lg border border-violet-200 bg-violet-50 p-4 text-xs leading-5 text-violet-950">
-                {JSON.stringify(extracted, null, 2)}
-              </pre>
+              <div>
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  LLM extraction
+                </h3>
+                <pre className="overflow-x-auto rounded-lg border border-violet-200 bg-violet-50 p-4 text-xs leading-5 text-violet-950">
+                  {JSON.stringify(extracted, null, 2)}
+                </pre>
+              </div>
             ) : null}
-          </section>
+          </details>
 
           <section>
             <h3 className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -210,21 +227,32 @@ export function DealDrawer({
               </p>
             ) : history.length ? (
               <ol className="space-y-4">
-                {history.map((entry) => (
-                  <li className="relative border-l border-slate-200 pl-5" key={entry.id}>
-                    <span className="absolute -left-1.5 top-1 size-3 rounded-full border-2 border-white bg-slate-400" />
-                    <p className="text-sm font-medium text-slate-800">
-                      {entry.field.replaceAll("_", " ")}
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">
-                      {valueText(entry.old_value)} → {valueText(entry.new_value)}
-                    </p>
-                    <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-400">
-                      <CalendarDays className="size-3" />
-                      {fmtDate(entry.changed_at, "MMM d, yyyy h:mm a")}
-                    </p>
-                  </li>
-                ))}
+                {history.map((entry) => {
+                  const author = authors.find((person) => person.id === entry.changed_by);
+                  return (
+                    <li className="relative border-l border-slate-200 pl-5" key={`${entry.id}:${entry.field}`}>
+                      <span className="absolute -left-1.5 top-1 size-3 rounded-full border-2 border-white bg-slate-400" />
+                      <p className="text-sm font-medium text-slate-800">
+                        {entry.field.startsWith("attributes.")
+                          ? entry.field
+                          : entry.field.replaceAll("_", " ")}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        {valueText(entry.old_value)} → {valueText(entry.new_value)}
+                      </p>
+                      <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-400">
+                        <CalendarDays className="size-3" />
+                        {fmtDate(entry.changed_at, "MMM d, yyyy h:mm a")}
+                      </p>
+                      <p className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                        {entry.changed_by ? (author?.full_name ?? "Unavailable user") : "Import"}
+                        {author?.role ? (
+                          <Badge variant="outline">{author.role.replaceAll("_", " ")}</Badge>
+                        ) : null}
+                      </p>
+                    </li>
+                  );
+                })}
               </ol>
             ) : (
               <p className="text-sm text-slate-500">No history yet.</p>

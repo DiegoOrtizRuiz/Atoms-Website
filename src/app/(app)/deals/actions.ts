@@ -3,7 +3,14 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import type { Database, Json } from "@/lib/database.types";
-import { canConfirmDeal, canEditDeal, dealStages, type Deal } from "@/lib/deals";
+import {
+  canConfirmDeal,
+  canEditDeal,
+  dealStages,
+  isUnconfirmed,
+  jsonObject,
+  type Deal,
+} from "@/lib/deals";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -88,9 +95,41 @@ export async function updateDeal(input: z.input<typeof updateSchema>) {
     ? parsed.field.slice("attributes.".length)
     : parsed.field;
   if (isAttribute) {
+    if (!current.vertical) {
+      throw new Error("Cannot edit attributes without a deal vertical.");
+    }
+    const { data: config, error: configError } = await supabase
+      .from("vertical_config")
+      .select("columns")
+      .eq("vertical", current.vertical)
+      .maybeSingle();
+    if (configError) throw new Error(configError.message);
+    if (!config || !Array.isArray(config.columns)) {
+      throw new Error("The deal's vertical configuration is unavailable.");
+    }
+    const column = config.columns
+      .map((item) => jsonObject(item))
+      .find((item) => item.key === provenanceKey);
+    if (!column || typeof column.type !== "string") {
+      throw new Error("Unknown attribute for this deal's vertical.");
+    }
+
+    const text = parsed.value === null ? "" : String(parsed.value).trim();
+    let value: string | number | boolean | null = text || null;
+    if (column.type === "number" && text) {
+      if (typeof parsed.value === "boolean" || !Number.isFinite(Number(text))) {
+        throw new Error("Enter a valid number for this attribute.");
+      }
+      value = Number(text);
+    } else if (column.type === "boolean" && text) {
+      if (text.toLowerCase() !== "true" && text.toLowerCase() !== "false") {
+        throw new Error("Enter true or false for this attribute.");
+      }
+      value = text.toLowerCase() === "true";
+    }
     const attributes = {
-      ...(current.attributes as Record<string, Json>),
-      [provenanceKey]: parsed.value as Json,
+      ...jsonObject(current.attributes),
+      [provenanceKey]: value,
     };
     patch.attributes = attributes;
   } else {
@@ -123,7 +162,13 @@ export async function updateDeal(input: z.input<typeof updateSchema>) {
   }
 
   revalidatePath("/deals");
-  return { conflict: false as const, deal: data };
+  return {
+    conflict: false as const,
+    deal: data,
+    provenanceKept:
+      !parsed.markAssumption &&
+      isUnconfirmed(jsonObject(current.field_provenance)[provenanceKey]),
+  };
 }
 
 export async function setDealAssumption(
@@ -226,8 +271,20 @@ export async function loadDealHistory(dealId: string) {
     .from("deal_history")
     .select("*")
     .eq("deal_id", dealId)
+    .not(
+      "field",
+      "in",
+      "(version,updated_at,updated_by,stage_entered_at,price_per_sf,price_per_lot_sf,created_at)",
+    )
     .order("changed_at", { ascending: false })
     .limit(100);
   if (error) throw new Error(error.message);
-  return data;
+  const authorIds = [...new Set(data.flatMap((entry) => entry.changed_by ? [entry.changed_by] : []))];
+  if (!authorIds.length) return { entries: data, authors: [] };
+  const { data: authors, error: authorsError } = await supabase
+    .from("profile_names")
+    .select("id, full_name, role")
+    .in("id", authorIds);
+  if (authorsError) throw new Error(authorsError.message);
+  return { entries: data, authors };
 }
