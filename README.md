@@ -1,5 +1,69 @@
 # Site Pipeline
 
+## Reviewer quick start
+
+- **Live app:** [atoms-website-three.vercel.app](https://atoms-website-three.vercel.app)
+- **Health:** [atoms-website-three.vercel.app/api/health](https://atoms-website-three.vercel.app/api/health)
+- **CI:** [![CI](https://github.com/DiegoOrtizRuiz/Atoms-Website/actions/workflows/ci.yml/badge.svg)](https://github.com/DiegoOrtizRuiz/Atoms-Website/actions/workflows/ci.yml)
+- **Process log:** [PROCESS_LOG.md](./PROCESS_LOG.md)
+- **Implementation plan and production checklist:** [PLAN.md](./PLAN.md)
+
+Public sign-up is disabled. Use the shared demo password provided separately
+in the submission email; it is intentionally not stored in this repository.
+
+| Demo account | What it demonstrates |
+| --- | --- |
+| `admin@demo.test` | User scopes, activity/usage dashboards, data health, role preview, CSV export |
+| `leadership@demo.test` | Weekly Review and snapshot saving without deal-edit permissions |
+| `lead.food@demo.test` | Food-vertical editing and assumption confirmation |
+| `analyst.a@demo.test` | Client A editing scope; other clients remain read-only |
+| `viewer@demo.test` | Read-only Operations and Weekly Review |
+
+### Try this in 2 minutes
+
+1. Review the import report: 18 rows in and out, 13 status spellings, four
+   flagged rows, and the caught $/SF discrepancy.
+2. In Operations, filter deals, edit a permitted field, open a deal drawer,
+   then confirm an assumption.
+3. In Weekly Review, find “Seattle closes Nov 25,” start presentation mode,
+   and export the PPTX.
+4. In Admin, inspect Online now and usage, then preview the Analyst role.
+5. Finish with the architecture: one cloud database powers every view; CI
+   tests the importer, and assumptions use an explicit confirmation workflow.
+
+### Architecture
+
+```mermaid
+flowchart TD
+  A[Messy Google Sheet<br/>tabs per client, different columns,<br/>colored text = assumption] --> B[Audit<br/>13 status spellings, no config tab,<br/>$/SF mismatch, blank vs 0, Metro vs city]
+  B --> C[normalize.py<br/>map by header name, keep raw values,<br/>recompute derived, flag never drop]
+  C --> T{25 tests in CI<br/>rows in = rows out?}
+  T -- fail --> C
+  T -- pass --> D[LLM enrichment<br/>notes -> dates, risks, price context,<br/>weekly note — suggestions only]
+  D --> E[(Supabase cloud Postgres<br/>ONE deals table<br/>history · provenance · RLS · Realtime)]
+  subgraph Vercel[Cloud-hosted Next.js app on Vercel]
+    F[Operations grid<br/>filter · edit · mark/confirm assumptions]
+    G[Weekly Review<br/>by vertical · needs attention ·<br/>present mode · PPTX export]
+    H[User logs & Permissions<br/>roles · online now · usage by person · audit]
+  end
+  E <--> F
+  E <--> G
+  E <--> H
+  I[GitHub push] --> J[CI: pytest · lint · tsc · build] --> K[Vercel deploy<br/>preview per PR · prod on main]
+```
+
+### Test commands
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+python -m pytest -q scripts
+```
+
+## Developer notes
+
 A Next.js 15 and Supabase application for S&P Real Estate acquisition
 operations, weekly reviews, and team administration. Every product view uses
 one cloud Postgres dataset.
