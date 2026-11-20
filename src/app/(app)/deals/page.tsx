@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { OperationsWorkspace } from "./operations-workspace";
 import { requireUser } from "@/lib/auth";
+import { effectiveRole } from "@/lib/effective-role";
 import { createClient } from "@/lib/supabase/server";
 import { dealStages, type DealStage } from "@/lib/deals";
 import type { DealFilters } from "./filter-controls";
@@ -19,6 +20,7 @@ export default async function DealsPage({
 }) {
   const params = await searchParams;
   const user = await requireUser();
+  const role = await effectiveRole(user);
   const supabase = await createClient();
   const [dealsResult, configResult] = await Promise.all([
     supabase.from("deals").select("*").order("updated_at", { ascending: false }),
@@ -55,6 +57,8 @@ export default async function DealsPage({
       } satisfies DealFilters}
       initialConfigs={configResult.data}
       initialDeals={dealsResult.data}
+      initialDealId={typeof params.deal === "string" ? params.deal : undefined}
+      effectiveRole={role}
       user={user}
     />
   );

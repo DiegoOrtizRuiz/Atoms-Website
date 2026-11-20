@@ -2,6 +2,7 @@ import { BarChart3, LogOut } from "lucide-react";
 import { signOut } from "@/app/login/actions";
 import type { CurrentUser } from "@/lib/auth";
 import { AppNav } from "./app-nav";
+import { RolePreviewControl } from "./role-preview-control";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 
@@ -16,11 +17,14 @@ function initials(name: string) {
 
 export function AppShell({
   children,
+  effectiveRole,
   user,
 }: {
   children: React.ReactNode;
+  effectiveRole: CurrentUser["role"];
   user: CurrentUser;
 }) {
+  const previewing = effectiveRole !== user.role;
   return (
     <div className="min-h-screen bg-slate-100 lg:grid lg:grid-cols-[260px_1fr]">
       <aside className="flex border-b border-slate-800 bg-slate-950 lg:fixed lg:inset-y-0 lg:w-[260px] lg:flex-col lg:border-b-0 lg:border-r">
@@ -35,8 +39,13 @@ export function AppShell({
             <p className="text-xs text-slate-500">Acquisitions workspace</p>
           </div>
         </div>
-        <AppNav role={user.role} />
+        <AppNav role={effectiveRole} />
         <div className="ml-auto border-l border-white/10 p-3 lg:ml-0 lg:mt-auto lg:border-l-0 lg:border-t">
+          {user.role === "admin" && (
+            <div className="mb-2 px-2">
+              <RolePreviewControl role={effectiveRole} />
+            </div>
+          )}
           <div className="flex items-center gap-3 rounded-lg px-2 py-2">
             <div className="grid size-9 shrink-0 place-items-center rounded-full bg-slate-800 text-xs font-semibold text-slate-200">
               {initials(user.fullName)}
@@ -65,7 +74,14 @@ export function AppShell({
           </div>
         </div>
       </aside>
-      <main className="min-w-0 lg:col-start-2">{children}</main>
+      <main className="min-w-0 lg:col-start-2">
+        {previewing && (
+          <div className="border-b border-amber-300 bg-amber-100 px-4 py-2 text-sm font-medium text-amber-950 md:px-8">
+            Previewing as {effectiveRole.replaceAll("_", " ")} — your real permissions still apply to saves.
+          </div>
+        )}
+        {children}
+      </main>
     </div>
   );
 }

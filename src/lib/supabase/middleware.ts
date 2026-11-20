@@ -51,13 +51,22 @@ export async function updateSession(request: NextRequest) {
   if (user) {
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("id")
+      .select("id, role")
       .eq("id", user.id)
       .maybeSingle();
 
     if (profileError || !profile) {
       await supabase.auth.signOut();
       activeUser = null;
+    } else if (
+      (request.nextUrl.pathname === "/admin" ||
+        request.nextUrl.pathname.startsWith("/admin/")) &&
+      profile.role !== "admin"
+    ) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/deals";
+      url.search = "";
+      return NextResponse.redirect(url);
     }
   }
 

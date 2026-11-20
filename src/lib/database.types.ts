@@ -54,6 +54,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "activity_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v_user_usage"
+            referencedColumns: ["user_id"]
+          },
         ]
       }
       contacts: {
@@ -146,6 +153,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_history_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "v_user_usage"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "deal_history_deal_id_fkey"
@@ -277,6 +291,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "deals_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "v_user_usage"
+            referencedColumns: ["user_id"]
+          },
         ]
       }
       profiles: {
@@ -370,6 +391,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "weekly_snapshots_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_user_usage"
+            referencedColumns: ["user_id"]
+          },
         ]
       }
     }
@@ -402,8 +430,28 @@ export type Database = {
         }
         Relationships: []
       }
+      v_user_usage: {
+        Row: {
+          edits_7d: number | null
+          last_active: string | null
+          last_login: string | null
+          logins_30d: number | null
+          logins_7d: number | null
+          page_views_7d: number | null
+          top_page: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      admin_logins_per_day: {
+        Args: { days: number }
+        Returns: {
+          day: string
+          login_count: number
+        }[]
+      }
       app_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]

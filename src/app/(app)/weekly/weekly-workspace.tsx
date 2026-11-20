@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import type { CurrentUser } from "@/lib/auth";
+import type { UserRole } from "@/lib/auth";
 import type { Json } from "@/lib/database.types";
 import { isUnconfirmed, type Deal, type DealHistory, type VerticalConfig } from "@/lib/deals";
 import { fmtMoney, fmtNumber, fmtOrDash } from "@/lib/format";
@@ -222,13 +222,13 @@ export function WeeklyWorkspace({
   initialConfigs,
   initialHistory,
   initialSnapshot,
-  user,
+  effectiveRole,
 }: {
   initialDeals: Deal[];
   initialConfigs: VerticalConfig[];
   initialHistory: DealHistory[];
   initialSnapshot: Snapshot | null;
-  user: CurrentUser;
+  effectiveRole: UserRole;
 }) {
   const [deals, setDeals] = useState(initialDeals);
   const [history, setHistory] = useState(initialHistory);
@@ -420,7 +420,7 @@ export function WeeklyWorkspace({
               <Eye className="size-4" />
               Compare to snapshot
             </Button>
-            {(user.role === "admin" || user.role === "leadership") ? (
+            {(effectiveRole === "admin" || effectiveRole === "leadership") ? (
               <Button disabled={saving} onClick={saveSnapshot} variant="outline">
                 <Save className="size-4" />
                 {saving ? "Saving…" : "Save snapshot"}

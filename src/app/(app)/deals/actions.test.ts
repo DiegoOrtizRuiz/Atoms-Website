@@ -14,15 +14,19 @@ const mocks = vi.hoisted(() => ({
     { key: "zoning", type: "text" },
   ],
   update: vi.fn(),
+  activityInsert: vi.fn().mockResolvedValue({ error: null }),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/auth", () => ({
-  requireUser: vi.fn().mockResolvedValue({ role: "admin" }),
+  requireUser: vi.fn().mockResolvedValue({ id: "admin-1", role: "admin" }),
 }));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn().mockImplementation(async () => ({
     from(table: string) {
+      if (table === "activity_log") {
+        return { insert: mocks.activityInsert };
+      }
       if (table === "vertical_config") {
         return {
           select: () => ({
@@ -55,7 +59,11 @@ vi.mock("@/lib/supabase/server", () => ({
 import { updateDeal } from "./actions";
 
 describe("updateDeal attributes", () => {
-  beforeEach(() => mocks.update.mockClear());
+  beforeEach(() => {
+    mocks.update.mockClear();
+    mocks.activityInsert.mockClear();
+    mocks.activityInsert.mockResolvedValue({ error: null });
+  });
 
   it("stores numeric and boolean values with their configured types", async () => {
     const result = await updateDeal({
@@ -65,6 +73,12 @@ describe("updateDeal attributes", () => {
       value: " 12.5 ",
     });
     expect(mocks.update).toHaveBeenLastCalledWith({ attributes: { doors: 12.5 } });
+    expect(mocks.activityInsert).toHaveBeenCalledWith({
+      user_id: "admin-1",
+      event: "deal_edit",
+      path: "/deals",
+      detail: { deal_id: "deal-1", field: "attributes.doors" },
+    });
     expect(result).toMatchObject({ conflict: false, provenanceKept: true });
 
     await updateDeal({

@@ -30,6 +30,7 @@ import {
   type VerticalConfig,
 } from "@/lib/deals";
 import { fmtDate, fmtMoney, fmtNumber, fmtOrDash } from "@/lib/format";
+import { usePresenceMembers } from "@/lib/presence";
 import { createClient } from "@/lib/supabase/client";
 import {
   confirmDealField,
@@ -44,12 +45,6 @@ import {
 import { ProvenanceCell, type CellActionContext } from "./provenance-cell";
 
 ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
-
-type PresenceMember = {
-  id: string;
-  name: string;
-  initials: string;
-};
 
 function unique(values: (string | null)[]) {
   return [...new Set(values.filter((value): value is string => Boolean(value)))].sort();
@@ -73,21 +68,31 @@ function money(value: unknown, decimals = 0) {
 
 export function OperationsWorkspace({
   initialDeals,
+  initialDealId,
   initialConfigs,
   initialFilters,
+  effectiveRole,
   user,
 }: {
   initialDeals: Deal[];
+  initialDealId?: string;
   initialConfigs: VerticalConfig[];
   initialFilters: DealFilters;
+  effectiveRole: CurrentUser["role"];
   user: CurrentUser;
 }) {
   const router = useRouter();
+  const uiUser = useMemo(() => ({ ...user, role: effectiveRole }), [effectiveRole, user]);
   const [deals, setDeals] = useState(initialDeals);
   const [filters, setFilters] = useState(initialFilters);
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [online, setOnline] = useState<PresenceMember[]>([]);
+  const openedQueryDeal = useRef<string | null>(null);
+  const online = usePresenceMembers().map((member) => ({
+    id: member.user_id,
+    name: member.full_name,
+    initials: initials(member.full_name),
+  }));
   const [changedRows, setChangedRows] = useState<Set<string>>(new Set());
   const gridApi = useRef<GridApi<Deal> | null>(null);
   const dealsRef = useRef(initialDeals);
@@ -95,6 +100,15 @@ export function OperationsWorkspace({
   useEffect(() => {
     dealsRef.current = deals;
   }, [deals]);
+
+  useEffect(() => {
+    if (!initialDealId || openedQueryDeal.current === initialDealId) return;
+    const deal = deals.find((item) => item.id === initialDealId);
+    if (!deal) return;
+    openedQueryDeal.current = initialDealId;
+    setSelectedDeal(deal);
+    setDrawerOpen(true);
+  }, [deals, initialDealId]);
 
   const configsByVertical = useMemo(
     () => new Map(initialConfigs.map((config) => [config.vertical, config])),
@@ -196,9 +210,7 @@ export function OperationsWorkspace({
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
-      .channel("deals-operations", {
-        config: { presence: { key: user.id } },
-      })
+      .channel("deals-operations")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "deals" },
@@ -216,25 +228,7 @@ export function OperationsWorkspace({
           }, 2200);
         },
       )
-      .on("presence", { event: "sync" }, () => {
-        const state = channel.presenceState<PresenceMember>();
-        const members = Object.values(state)
-          .flat()
-          .filter(
-            (member, index, list) =>
-              list.findIndex((candidate) => candidate.id === member.id) === index,
-          );
-        setOnline(members);
-      })
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          void channel.track({
-            id: user.id,
-            name: user.fullName,
-            initials: initials(user.fullName),
-          });
-        }
-      });
+      .subscribe();
 
     const pollingInterval = window.setInterval(async () => {
       const { data, error } = await supabase
@@ -271,7 +265,7 @@ export function OperationsWorkspace({
       window.clearInterval(pollingInterval);
       void supabase.removeChannel(channel);
     };
-  }, [replaceDeal, user.fullName, user.id]);
+  }, [replaceDeal, user.id]);
 
   const handleCellChange = useCallback(
     async (event: CellValueChangedEvent<Deal>) => {
@@ -304,14 +298,14 @@ export function OperationsWorkspace({
   );
 
   const baseColumns = useMemo<ColDef<Deal>[]>(() => {
-    const editable = (deal: Deal) => canEditDeal(user, deal);
+    const editable = (deal: Deal) => canEditDeal(uiUser, deal);
     const editableNumeric: ColDef<Deal> = {
       editable: ({ data }) => Boolean(data && editable(data)),
       cellEditor: "agNumberCellEditor",
       valueParser: ({ newValue }) =>
         newValue === "" || newValue == null ? null : Number(newValue),
     };
-    const provenanceParams = { context: { user, markAssumption, confirmField } };
+    const provenanceParams = { context: { user: uiUser, markAssumption, confirmField } };
     return [
       { field: "vertical", minWidth: 145, cellRenderer: ProvenanceCell },
       { field: "client", minWidth: 115, cellRenderer: ProvenanceCell },
@@ -453,7 +447,7 @@ export function OperationsWorkspace({
         valueFormatter: ({ value }) => fmtDate(value, "MMM d, h:mm a"),
       },
     ];
-  }, [confirmField, markAssumption, user]);
+  }, [confirmField, markAssumption, uiUser]);
 
   const columns = useMemo<ColDef<Deal>[]>(() => {
     if (filters.verticals.length !== 1) return baseColumns;
@@ -481,7 +475,7 @@ export function OperationsWorkspace({
           };
           return true;
         },
-        editable: ({ data }: { data?: Deal }) => Boolean(data && canEditDeal(user, data)),
+        editable: ({ data }: { data?: Deal }) => Boolean(data && canEditDeal(uiUser, data)),
         onCellValueChanged: undefined,
         valueFormatter: (params: ValueFormatterParams<Deal>) =>
           moneyColumn
@@ -493,10 +487,10 @@ export function OperationsWorkspace({
       }];
     });
     return [...baseColumns, ...dynamicColumns];
-  }, [baseColumns, configsByVertical, filters.verticals, user]);
+  }, [baseColumns, configsByVertical, filters.verticals, uiUser]);
 
   const gridContext: CellActionContext = {
-    user,
+    user: uiUser,
     markAssumption,
     confirmField,
     onSelectDeal: (deal) => {

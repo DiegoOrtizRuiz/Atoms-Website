@@ -75,9 +75,26 @@ async function loadEditableDeal(dealId: string) {
   return { data, supabase, user };
 }
 
+async function logDealEdit(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  dealId: string,
+  field: string,
+) {
+  const { error } = await supabase.from("activity_log").insert({
+    user_id: userId,
+    event: "deal_edit",
+    path: "/deals",
+    detail: { deal_id: dealId, field },
+  });
+  if (error) {
+    throw new Error(`Deal was updated but activity logging failed: ${error.message}`);
+  }
+}
+
 export async function updateDeal(input: z.input<typeof updateSchema>) {
   const parsed = updateSchema.parse(input);
-  const { data: current, supabase } = await loadEditableDeal(parsed.dealId);
+  const { data: current, supabase, user } = await loadEditableDeal(parsed.dealId);
   if (parsed.version !== current.version) {
     return {
       conflict: true as const,
@@ -161,6 +178,7 @@ export async function updateDeal(input: z.input<typeof updateSchema>) {
     };
   }
 
+  await logDealEdit(supabase, user.id, parsed.dealId, parsed.field);
   revalidatePath("/deals");
   return {
     conflict: false as const,
@@ -175,7 +193,7 @@ export async function setDealAssumption(
   input: z.input<typeof provenanceSchema>,
 ) {
   const parsed = provenanceSchema.parse(input);
-  const { data: current, supabase } = await loadEditableDeal(parsed.dealId);
+  const { data: current, supabase, user } = await loadEditableDeal(parsed.dealId);
   if (parsed.version !== current.version) {
     return {
       conflict: true as const,
@@ -203,6 +221,7 @@ export async function setDealAssumption(
       deal: await reloadDeal(parsed.dealId),
     };
   }
+  await logDealEdit(supabase, user.id, parsed.dealId, parsed.field);
   revalidatePath("/deals");
   return { conflict: false as const, deal: data };
 }
@@ -248,6 +267,7 @@ export async function confirmDealField(
       deal: await reloadDeal(parsed.dealId),
     };
   }
+  await logDealEdit(supabase, user.id, parsed.dealId, parsed.field);
   revalidatePath("/deals");
   return { conflict: false as const, deal: data };
 }

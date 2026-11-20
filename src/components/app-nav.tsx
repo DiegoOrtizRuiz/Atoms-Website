@@ -7,6 +7,7 @@ import {
   ChartNoAxesCombined,
   LayoutDashboard,
   ShieldCheck,
+  UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/lib/auth";
@@ -15,6 +16,7 @@ const links = [
   { href: "/deals", label: "Operations", icon: LayoutDashboard },
   { href: "/weekly", label: "Weekly Review", icon: BarChart3 },
   { href: "/rollup", label: "Rollup", icon: ChartNoAxesCombined },
+  { href: "/me", label: "My profile", icon: UserRound },
   { href: "/admin", label: "Admin", icon: ShieldCheck, adminOnly: true },
 ] as const;
 

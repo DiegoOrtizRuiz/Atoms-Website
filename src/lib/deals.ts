@@ -1,5 +1,9 @@
 import type { CurrentUser } from "@/lib/auth";
 import type { Database, Json } from "@/lib/database.types";
+import {
+  roleCanConfirmAssumptions,
+  roleCanEditDeals,
+} from "@/lib/permissions";
 
 export type Deal = Database["public"]["Tables"]["deals"]["Row"];
 export type DealHistory =
@@ -28,6 +32,7 @@ export const weeklyStages: DealStage[] = [
 ];
 
 export function canEditDeal(user: CurrentUser, deal: Deal) {
+  if (!roleCanEditDeals(user.role)) return false;
   if (user.role === "admin") return true;
   if (user.role === "acq_lead") {
     return Boolean(deal.vertical && user.verticals.includes(deal.vertical));
@@ -40,8 +45,9 @@ export function canEditDeal(user: CurrentUser, deal: Deal) {
 
 export function canConfirmDeal(user: CurrentUser, deal: Deal) {
   return (
-    user.role === "admin" ||
+    (roleCanConfirmAssumptions(user.role) && user.role === "admin") ||
     (user.role === "acq_lead" &&
+      roleCanConfirmAssumptions(user.role) &&
       Boolean(deal.vertical && user.verticals.includes(deal.vertical)))
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth";
+import { effectiveRole } from "@/lib/effective-role";
 import { createClient } from "@/lib/supabase/server";
 import { WeeklyWorkspace } from "./weekly-workspace";
 
@@ -7,6 +8,7 @@ export const metadata: Metadata = { title: "Weekly Review" };
 
 export default async function WeeklyPage() {
   const user = await requireUser();
+  const role = await effectiveRole(user);
   const supabase = await createClient();
   const [deals, configs, history, snapshot] = await Promise.all([
     supabase.from("deals").select("*").order("updated_at", { ascending: false }),
@@ -45,7 +47,7 @@ export default async function WeeklyPage() {
       initialDeals={deals.data ?? []}
       initialHistory={history.data ?? []}
       initialSnapshot={snapshot.data}
-      user={user}
+      effectiveRole={role}
     />
   );
 }

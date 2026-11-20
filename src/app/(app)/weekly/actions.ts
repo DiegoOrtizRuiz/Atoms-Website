@@ -31,6 +31,15 @@ export async function saveWeeklySnapshot(input: z.input<typeof snapshotSchema>) 
     .select("id, week_start, created_at, data")
     .single();
   if (error) throw new Error(error.message);
+  const { error: activityError } = await supabase.from("activity_log").insert({
+    user_id: user.id,
+    event: "snapshot",
+    path: "/weekly",
+    detail: { snapshot_id: data.id, week_start: data.week_start },
+  });
+  if (activityError) {
+    throw new Error(`Snapshot was saved but activity logging failed: ${activityError.message}`);
+  }
   revalidatePath("/weekly");
   return data;
 }
