@@ -1,24 +1,21 @@
 import { NextResponse } from "next/server";
-import { hasSupabaseConfig } from "@/lib/supabase/config";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const version = process.env.VERCEL_GIT_COMMIT_SHA ?? "development";
-  if (!hasSupabaseConfig) {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return NextResponse.json({ ok: true, db: false, deals: 0, version });
   }
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { count, error } = await supabase
     .from("deals")
     .select("id", { count: "exact", head: true });
 
   if (error) {
-    if (error.code !== "42P01") {
-      console.error("Health check could not query the deals table.", error);
-    }
+    console.error("Health check could not query the deals table.", error);
     return NextResponse.json({ ok: true, db: false, deals: 0, version });
   }
 
