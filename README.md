@@ -84,6 +84,26 @@ The app uses invite-only Supabase Auth. Public sign-up must remain disabled.
 The `/api/health` endpoint reports application, database, deal-count, and build
 information without exposing credentials.
 
+Set `NEXT_PUBLIC_SITE_URL` to the canonical application origin (for example
+`https://example.com`) and allow its `/auth/callback` URL with the
+`next=/auth/set-password` query in Supabase Auth URL configuration. Default
+invite links and PKCE recovery links work without custom templates; PKCE
+recovery links must be opened in the browser that requested the reset.
+For recovery on a different device, configure custom SMTP and change Supabase's
+**Invite user** and **Reset password** templates to link directly to the
+callback using the token hash:
+
+```html
+<!-- Invite user -->
+<a href="{{ .RedirectTo }}&amp;token_hash={{ .TokenHash }}&amp;type=invite">Accept invitation</a>
+<!-- Reset password -->
+<a href="{{ .RedirectTo }}&amp;token_hash={{ .TokenHash }}&amp;type=recovery">Reset password</a>
+```
+
+Configure email delivery in Supabase. Temporary-password users must choose a new
+password before accessing application data; distribute the one-time password
+securely. The callback also supports PKCE authorization codes.
+
 ## Validation
 
 ```bash

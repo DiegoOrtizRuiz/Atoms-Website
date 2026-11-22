@@ -60,7 +60,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("full_name, email, role, verticals, clients, active")
+    .select("full_name, email, role, verticals, clients, active, must_change_password")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -77,6 +77,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     console.warn("An inactive user attempted to enter the application.");
     return null;
   }
+  if (profile.must_change_password) redirect("/auth/set-password");
 
   const fallback = userFromAuth(user);
   return {

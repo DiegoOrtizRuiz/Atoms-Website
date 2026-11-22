@@ -7,9 +7,9 @@ export const metadata: Metadata = { title: "Sign in" };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; error?: string }>;
 }) {
-  const { next } = await searchParams;
+  const { next, error } = await searchParams;
 
   return (
     <main className="grid min-h-screen bg-slate-950 lg:grid-cols-[1.15fr_0.85fr]">
@@ -78,6 +78,7 @@ export default async function LoginPage({
                 Sign in with your invited team account.
               </p>
             </div>
+            {error === "auth_link" && <p className="mb-4 text-sm text-red-700" role="alert">This authentication link is invalid or has expired. Request a new link.</p>}
             <LoginForm nextPath={next} />
           </div>
           <p className="mt-6 text-center text-xs leading-5 text-slate-500">

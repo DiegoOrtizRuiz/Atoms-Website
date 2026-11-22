@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser, userRoles } from "@/lib/auth";
+import { authCallbackUrl } from "@/lib/auth-redirect";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,11 +22,12 @@ const inviteSchema = z.object({
   role: z.enum(userRoles),
   verticals: z.array(z.string().trim().min(1)).max(100),
   clients: z.array(z.string().trim().min(1)).max(100),
+  mode: z.enum(["temporary", "email"]).default("temporary"),
 });
 
 const activityFilterSchema = z.object({
   userId: z.uuid().optional(),
-  event: z.enum(["login", "page_view", "deal_edit", "admin_change", "snapshot", "csv_export"]).optional(),
+  event: z.enum(["login", "page_view", "deal_edit", "admin_change", "snapshot", "csv_export", "password_set"]).optional(),
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
   page: z.number().int().min(1).default(1),
@@ -122,15 +124,11 @@ export async function inviteAdminUser(input: z.input<typeof inviteSchema>) {
   const sessionClient = await createClient();
   const adminClient = createAdminClient();
 
-  const { data: invited, error: inviteError } =
-    await adminClient.auth.admin.inviteUserByEmail(parsed.email, {
-      data: { full_name: parsed.fullName },
-    });
-
-  let userId = invited.user?.id;
-  let temporaryPassword: string | null = null;
-  if (inviteError) {
-    temporaryPassword = randomBytes(24).toString("base64url");
+  let userId: string | undefined;
+  const temporaryPassword = parsed.mode === "temporary"
+    ? randomBytes(24).toString("base64url")
+    : null;
+  if (temporaryPassword) {
     const { data: created, error: createError } =
       await adminClient.auth.admin.createUser({
         email: parsed.email,
@@ -138,8 +136,16 @@ export async function inviteAdminUser(input: z.input<typeof inviteSchema>) {
         email_confirm: true,
         user_metadata: { full_name: parsed.fullName },
       });
-    if (createError) throw new Error(`Invite failed: ${inviteError.message}. User creation failed: ${createError.message}`);
-    userId = created.user.id;
+    if (createError) throw new Error(`User creation failed: ${createError.message}`);
+    userId = created.user?.id;
+  } else {
+    const { data: invited, error: inviteError } =
+      await adminClient.auth.admin.inviteUserByEmail(parsed.email, {
+        data: { full_name: parsed.fullName },
+        redirectTo: authCallbackUrl(),
+      });
+    if (inviteError) throw new Error(`Invite failed: ${inviteError.message}`);
+    userId = invited.user?.id;
   }
 
   if (!userId) throw new Error("Supabase did not return an ID for the invited user.");
@@ -152,6 +158,7 @@ export async function inviteAdminUser(input: z.input<typeof inviteSchema>) {
     verticals: [...new Set(parsed.verticals)],
     clients: [...new Set(parsed.clients)],
     active: true,
+    must_change_password: Boolean(temporaryPassword),
   });
   if (profileError) {
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
@@ -168,10 +175,14 @@ export async function inviteAdminUser(input: z.input<typeof inviteSchema>) {
     detail: {
       target_user: userId,
       field: "invite",
-      new: { email: parsed.email, role: parsed.role },
+      new: { email: parsed.email, role: parsed.role, mode: parsed.mode },
     },
   });
-  if (logError) throw new Error(`User invited but audit logging failed: ${logError.message}`);
+  if (logError) {
+    const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
+    if (deleteError) throw new Error(`Audit logging failed and the new account could not be removed: ${deleteError.message}`);
+    throw new Error(`Account creation was rolled back because audit logging failed: ${logError.message}`);
+  }
 
   revalidatePath("/admin");
   return { temporaryPassword };

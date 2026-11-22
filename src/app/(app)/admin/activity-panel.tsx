@@ -10,10 +10,10 @@ import type { Database } from "@/lib/database.types";
 import { getAdminActivity } from "./actions";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
-type ActivityEvent = "login" | "page_view" | "deal_edit" | "admin_change" | "snapshot" | "csv_export";
+type ActivityEvent = "login" | "page_view" | "deal_edit" | "admin_change" | "snapshot" | "csv_export" | "password_set";
 type ActivityRow = Awaited<ReturnType<typeof getAdminActivity>>["rows"][number];
 
-const events: ActivityEvent[] = ["login", "page_view", "deal_edit", "admin_change", "snapshot", "csv_export"];
+const events: ActivityEvent[] = ["login", "page_view", "deal_edit", "admin_change", "snapshot", "csv_export", "password_set"];
 
 function detailObject(value: ActivityRow["detail"]) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};

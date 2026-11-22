@@ -154,6 +154,7 @@ export function UsersPanel({
   const [inviteClients, setInviteClients] = useState<string[]>([]);
   const [inviteError, setInviteError] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteMode, setInviteMode] = useState<"temporary" | "email">("temporary");
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
 
   const usageById = new Map(usage.flatMap((item) => item.user_id ? [[item.user_id, item] as const] : []));
@@ -206,6 +207,7 @@ export function UsersPanel({
         role: inviteRole,
         verticals: inviteVerticals,
         clients: inviteClients,
+        mode: inviteMode,
       });
       setTemporaryPassword(result.temporaryPassword);
       setEmail("");
@@ -224,7 +226,7 @@ export function UsersPanel({
       <Card>
         <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>Users &amp; permissions</CardTitle>
-          <Button onClick={() => { setInviteOpen(true); setInviteError(""); setTemporaryPassword(null); }}>
+          <Button onClick={() => { setInviteOpen(true); setInviteError(""); setTemporaryPassword(null); setInviteMode("temporary"); }}>
             Invite user
           </Button>
         </CardHeader>
@@ -299,9 +301,14 @@ export function UsersPanel({
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Invite user</DialogTitle>
-            <DialogDescription>An invite email is sent when Supabase email delivery is configured.</DialogDescription>
+            <DialogDescription>Create a user with a temporary password or send an email invitation.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {!temporaryPassword && <fieldset className="space-y-2 text-sm">
+              <legend className="font-medium">Account setup</legend>
+              <label className="flex items-center gap-2"><input checked={inviteMode === "temporary"} onChange={() => setInviteMode("temporary")} name="invite-mode" type="radio" /> Create with temporary password</label>
+              <label className="flex items-center gap-2"><input checked={inviteMode === "email"} onChange={() => setInviteMode("email")} name="invite-mode" type="radio" /> Send email invite</label>
+            </fieldset>}
             <label className="grid gap-1 text-sm font-medium">Full name<Input autoComplete="name" onChange={(event) => setFullName(event.target.value)} value={fullName} /></label>
             <label className="grid gap-1 text-sm font-medium">Email<Input autoComplete="email" onChange={(event) => setEmail(event.target.value)} type="email" value={email} /></label>
             <RoleSelect onChange={setInviteRole} value={inviteRole} />
@@ -311,10 +318,17 @@ export function UsersPanel({
             {temporaryPassword && <div className="space-y-1 rounded-md border border-amber-400 bg-amber-50 p-3 text-sm">
               <p className="font-semibold">Show this temporary password once. It will not be available again.</p>
               <code className="select-all break-all">{temporaryPassword}</code>
+              <Button onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(temporaryPassword);
+                } catch {
+                  setInviteError("Unable to copy the password. Select and copy it manually.");
+                }
+              }} size="sm" type="button" variant="outline">Copy password</Button>
             </div>}
           </div>
           <DialogFooter>
-            <Button disabled={inviteBusy || Boolean(temporaryPassword)} onClick={invite}>{inviteBusy ? "Inviting…" : "Send invite"}</Button>
+            <Button disabled={inviteBusy || Boolean(temporaryPassword)} onClick={invite}>{inviteBusy ? "Creating…" : inviteMode === "temporary" ? "Create user" : "Send invite"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

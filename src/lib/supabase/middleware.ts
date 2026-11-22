@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import type { Database } from "@/lib/database.types";
 import { hasSupabaseConfig, supabaseConfig } from "./config";
 
-const publicRoutes = ["/login", "/api/health"];
+const publicRoutes = ["/login", "/api/health", "/auth"];
 
 export async function updateSession(request: NextRequest) {
   const isPublicRoute = publicRoutes.some(
@@ -47,11 +47,20 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  function redirectTo(path: string) {
+    const url = request.nextUrl.clone();
+    url.pathname = path;
+    url.search = "";
+    const redirectResponse = NextResponse.redirect(url);
+    response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
+    return redirectResponse;
+  }
+
   let activeUser = user;
   if (user) {
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("id, role")
+      .select("id, role, must_change_password")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -59,14 +68,19 @@ export async function updateSession(request: NextRequest) {
       await supabase.auth.signOut();
       activeUser = null;
     } else if (
+      profile.must_change_password &&
+      request.nextUrl.pathname !== "/auth/set-password" &&
+      request.nextUrl.pathname !== "/auth/callback" &&
+      request.nextUrl.pathname !== "/auth/complete" &&
+      request.nextUrl.pathname !== "/api/health"
+    ) {
+      return redirectTo("/auth/set-password");
+    } else if (
       (request.nextUrl.pathname === "/admin" ||
         request.nextUrl.pathname.startsWith("/admin/")) &&
       profile.role !== "admin"
     ) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/deals";
-      url.search = "";
-      return NextResponse.redirect(url);
+      return redirectTo("/deals");
     }
   }
 
@@ -78,10 +92,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (activeUser && request.nextUrl.pathname === "/login") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/deals";
-    url.search = "";
-    return NextResponse.redirect(url);
+    return redirectTo("/deals");
   }
 
   return response;

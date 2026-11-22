@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { safeNextPath } from "@/lib/auth-redirect";
 import { hasSupabaseConfig } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
@@ -61,12 +62,7 @@ export async function signIn(
   }
 
   const requestedPath = formData.get("next");
-  const destination =
-    typeof requestedPath === "string" &&
-    requestedPath.startsWith("/") &&
-    !requestedPath.startsWith("//")
-      ? requestedPath
-      : "/deals";
+  const destination = safeNextPath(typeof requestedPath === "string" ? requestedPath : null);
   redirect(destination);
 }
 
