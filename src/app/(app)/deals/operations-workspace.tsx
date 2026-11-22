@@ -315,7 +315,7 @@ export function OperationsWorkspace({
         field: "address",
         minWidth: 210,
         flex: 1.2,
-        tooltipValueGetter: ({ data }) =>
+        tooltip: ({ data }) =>
           data ? [data.address, data.city, data.state].filter(Boolean).join(", ") : "",
         cellRenderer: (params: { data?: Deal; context: CellActionContext }) => {
           const deal = params.data;
@@ -343,7 +343,7 @@ export function OperationsWorkspace({
         editable: ({ data }) => Boolean(data && editable(data)),
         cellEditor: "agSelectCellEditor",
         cellEditorParams: { values: dealStages },
-        tooltipValueGetter: ({ data }) =>
+        tooltip: ({ data }) =>
           data?.stage_raw && data.stage_raw !== data.stage ? `Source: ${data.stage_raw}` : "",
         cellRenderer: (params: ICellRendererParams<Deal>) => {
           const value = params.value ?? "Needs review";
@@ -409,7 +409,7 @@ export function OperationsWorkspace({
         minWidth: 190,
         flex: 1,
         editable: ({ data }) => Boolean(data && editable(data)),
-        tooltipValueGetter: ({ value }) => fmtOrDash(value),
+        tooltip: ({ value }) => fmtOrDash(value),
         cellRenderer: ProvenanceCell,
       },
       {
@@ -424,7 +424,7 @@ export function OperationsWorkspace({
         headerName: "Weekly note",
         minWidth: 190,
         editable: ({ data }) => Boolean(data && editable(data)),
-        tooltipValueGetter: ({ value }) => fmtOrDash(value),
+        tooltip: ({ value }) => fmtOrDash(value),
         cellRenderer: ProvenanceCell,
       },
       {

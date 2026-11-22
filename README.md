@@ -1,6 +1,6 @@
 # Site Pipeline
 
-## Reviewer quick start
+## Start here: reviewer quick start
 
 - **Live app:** [atoms-website-three.vercel.app](https://atoms-website-three.vercel.app)
 - **Health:** [atoms-website-three.vercel.app/api/health](https://atoms-website-three.vercel.app/api/health)
@@ -8,8 +8,18 @@
 - **Process log:** [PROCESS_LOG.md](./PROCESS_LOG.md)
 - **Implementation plan and production checklist:** [PLAN.md](./PLAN.md)
 
-Public sign-up is disabled. Use the shared demo password provided separately
-in the submission email; it is intentionally not stored in this repository.
+### Sign in
+
+1. Open the live app and enter one of the demo email addresses below.
+2. Enter the shared demo password from the submission email. The password is
+   intentionally not included in this repository.
+3. Select **Sign in**. Public sign-up is turned off, so reviewers do not need to
+   create an account.
+
+If you cannot sign in, check that the email and password were copied exactly.
+If the problem continues, contact the person who provided the demo credentials.
+The [health page](https://atoms-website-three.vercel.app/api/health) is a
+technical status check; it is not another sign-in page.
 
 | Demo account | What it demonstrates |
 | --- | --- |
@@ -19,17 +29,115 @@ in the submission email; it is intentionally not stored in this repository.
 | `analyst.a@demo.test` | Client A editing scope; other clients remain read-only |
 | `viewer@demo.test` | Read-only Operations and Weekly Review |
 
-### Try this in 2 minutes
+Each account has different permissions. For example, a read-only account can
+still browse deals, but cannot save deal edits. If an edit is unavailable, sign
+in with an account that has permission rather than trying to work around it.
+All accounts use the password supplied in the submission email.
 
-1. Review the import report: 18 rows in and out, 13 status spellings, four
-   flagged rows, and the caught $/SF discrepancy.
-2. In Operations, filter deals, edit a permitted field, open a deal drawer,
-   then confirm an assumption.
-3. In Weekly Review, find “Seattle closes Nov 25,” start presentation mode,
-   and export the PPTX.
-4. In Admin, inspect Online now and usage, then preview the Analyst role.
-5. Finish with the architecture: one cloud database powers every view; CI
-   tests the importer, and assumptions use an explicit confirmation workflow.
+### First visit: where to go
+
+After signing in, use the navigation on the left:
+
+- **Operations** is the live deal list. Use it to find and, if your role allows,
+  update a deal.
+- **Weekly Review** is the meeting-ready summary of deals included in the
+  weekly pipeline.
+- **Rollup** summarizes deal counts by vertical and stage, time spent in a
+  stage, and contact outreach.
+- **My profile** shows your account role and recent activity.
+- **Admin** is visible only to administrators. It contains user management,
+  activity, usage, and data-health information.
+
+On a smaller screen, the navigation may be arranged across the top. Your name
+and role appear near the bottom of the navigation area. Use the sign-out icon
+beside your account when you are finished or want to switch demo accounts.
+
+### Operations: find and review a deal
+
+1. Open **Operations**. The number above the grid tells you how many deals are
+   currently shown.
+2. Use **Client**, **Vertical**, **Market**, or **Stage** to narrow the list.
+   You can select more than one value. The filters work together; choose
+   **Reset** to show everything again.
+3. **Needs review** filters for records whose source status needs a person to
+   review its mapping. **Has assumptions** finds values that are explicitly
+   marked as unconfirmed.
+4. Select a deal's address to open its details, including notes and the change
+   history. A blank value is shown as an em dash (`—`), meaning it is unknown.
+5. If you have edit permission, double-click an editable cell, make the
+   change, and press **Enter** to save. Wait for the save confirmation. If the
+   app says someone else edited the deal, the latest value has been reloaded;
+   review it before trying again.
+
+Italic text with a colored dot is marked as unconfirmed: amber means an
+assumption and purple means an LLM suggestion. Use the cell's three-dot menu
+to **Mark as assumption** or, if your role permits, **Confirm value**. A
+confirmed value no longer has the unconfirmed styling. Calculated fields such
+as **$/SF** are read-only because the app derives them from other values.
+
+### Weekly Review: prepare for a meeting
+
+1. Open **Weekly Review** and scan **Needs attention this week** for upcoming
+   key dates, recent stage changes, and new deals.
+2. Review the deal lists grouped by vertical. Select **Show all deals** to
+   include deals that are not normally in the weekly view.
+3. Select **Present** for a larger, presentation-style view. Use **Previous**
+   and **Next**, or the arrow keys/space bar, to move between sections. Select
+   **Exit** to leave presentation mode.
+4. Select **Export PPTX** to download a PowerPoint deck based on the same
+   weekly data shown on screen.
+5. Administrators and Leadership can select **Save snapshot** to save the
+   current weekly view. **Compare to snapshot** shows how it differs from the
+   saved view.
+
+The LLM enrichment script is optional and is not something reviewers need to
+run. The app can show deterministic dates found in deal notes without an LLM
+provider or API key.
+
+### Rollup and Admin
+
+- On **Rollup**, select a number in the vertical-by-stage table to open
+  Operations filtered to those deals. Select a deal in **Longest in current
+  stage** to open its details. Contact outreach percentages summarize the
+  contact records.
+- On **Admin**, use the tabs to review the overview, users, activity, and data
+  health. **Online now** shows signed-in users currently viewing the app.
+  Administrators can use role preview to inspect how the interface appears
+  for another role; preview does not grant that role's permissions to the
+  administrator.
+
+### A guided five-step tour
+
+1. Sign in as `viewer@demo.test` and open **Operations**. Filter by a vertical
+   or stage, then select a deal address to see its notes and history.
+2. Find an italicized value with a colored dot. Read its tooltip to see whether
+   it is an assumption or an LLM suggestion. A viewer can inspect it but
+   cannot change or confirm it.
+3. Open **Weekly Review** and look for the Seattle closing date in **Needs
+   attention this week**. Try **Present** and **Export PPTX**.
+4. Sign out and sign in as `leadership@demo.test`. Return to Weekly Review and
+   try **Save snapshot**. Leadership can save a snapshot but cannot edit deal
+   records.
+5. If you have the admin credentials, sign in as `admin@demo.test` and review
+   **Online now**, usage, and data health on the **Admin** page.
+
+### Helpful notes for reviewers
+
+- The app uses one shared live dataset. A permitted edit is saved immediately
+  and can be seen by other reviewers, so use demo data only and do not enter
+  confidential or real-world information.
+- A blank is unknown, not zero. Missing values appear as `—`.
+- **Market** is the search metro; **City** and **State** describe the
+  property's location. They can be different.
+- An unavailable button or read-only cell usually means the signed-in role
+  does not have permission for that action.
+- If a page does not load, refresh once and check the health link above. If the
+  health response reports a problem or you remain unable to sign in, contact
+  the person who shared the demo.
+
+For a quick tour of the architecture, see the diagram below. The importer
+report is a developer/CI check, not a page or action that reviewers need to
+find in the app.
 
 ### Architecture
 
@@ -39,8 +147,9 @@ flowchart TD
   B --> C[normalize.py<br/>map by header name, keep raw values,<br/>recompute derived, flag never drop]
   C --> T{25 tests in CI<br/>rows in = rows out?}
   T -- fail --> C
-  T -- pass --> D[LLM enrichment<br/>notes -> dates, risks, price context,<br/>weekly note — suggestions only]
-  D --> E[(Supabase cloud Postgres<br/>ONE deals table<br/>history · provenance · RLS · Realtime)]
+  T -- pass --> E[(Supabase cloud Postgres<br/>ONE deals table<br/>history · provenance · RLS · Realtime)]
+  T -. optional .-> D[Local LLM enrichment<br/>notes -> dates, risks, price context,<br/>weekly note — suggestions only]
+  D --> E
   subgraph Vercel[Cloud-hosted Next.js app on Vercel]
     F[Operations grid<br/>filter · edit · mark/confirm assumptions]
     G[Weekly Review<br/>by vertical · needs attention ·<br/>present mode · PPTX export]
