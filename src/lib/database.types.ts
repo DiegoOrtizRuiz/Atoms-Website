@@ -113,6 +113,7 @@ export type Database = {
           changed_at: string
           changed_by: string | null
           deal_id: string
+          detail: Json | null
           field: string
           id: number
           new_value: Json | null
@@ -123,6 +124,7 @@ export type Database = {
           changed_at?: string
           changed_by?: string | null
           deal_id: string
+          detail?: Json | null
           field: string
           id?: number
           new_value?: Json | null
@@ -133,6 +135,7 @@ export type Database = {
           changed_at?: string
           changed_by?: string | null
           deal_id?: string
+          detail?: Json | null
           field?: string
           id?: number
           new_value?: Json | null
@@ -297,6 +300,66 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_user_usage"
             referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      import_runs: {
+        Row: {
+          applied_at: string | null
+          applied_by: string | null
+          created_at: string
+          created_by: string
+          diff: Json
+          error_message: string | null
+          file_name: string
+          file_sha256: string
+          id: number
+          status: "previewed" | "applied" | "discarded" | "failed"
+          storage_path: string | null
+          summary: Json
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          created_at?: string
+          created_by: string
+          diff?: Json
+          error_message?: string | null
+          file_name: string
+          file_sha256: string
+          id?: number
+          status: "previewed" | "applied" | "discarded" | "failed"
+          storage_path?: string | null
+          summary?: Json
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          created_at?: string
+          created_by?: string
+          diff?: Json
+          error_message?: string | null
+          file_name?: string
+          file_sha256?: string
+          id?: number
+          status?: "previewed" | "applied" | "discarded" | "failed"
+          storage_path?: string | null
+          summary?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_runs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_runs_applied_by_fkey"
+            columns: ["applied_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -538,6 +601,10 @@ export type Database = {
       app_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
+      }
+      apply_import: {
+        Args: { decisions?: Json; run_id: number }
+        Returns: Json
       }
       current_profile: {
         Args: never

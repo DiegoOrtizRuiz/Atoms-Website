@@ -88,6 +88,19 @@ begin
   where id = current_setting('test.client_a_id');
   get diagnostics affected = row_count;
   if affected <> 0 then raise exception 'Viewer updated a deal'; end if;
+
+  begin
+    insert into public.import_runs (created_by, file_name, file_sha256, status)
+    values (current_setting('test.viewer_id')::uuid, 'blocked.xlsx', 'abc', 'previewed');
+    raise exception 'Viewer inserted into import_runs';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    perform public.apply_import(-1, '{}'::jsonb);
+    raise exception 'Viewer executed apply_import';
+  exception when insufficient_privilege then null;
+  end;
 end;
 $$;
 

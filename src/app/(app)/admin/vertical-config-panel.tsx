@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,7 @@ import { fmtDate, fmtNumber } from "@/lib/format";
 import type { Database } from "@/lib/database.types";
 import {
   addVerticalConfig,
+  registerSourceTab,
   reorderVerticalConfigs,
   saveSourceTab,
   saveVerticalConfig,
@@ -79,10 +81,14 @@ function columnCount(counts: Record<string, number>, key: string) {
 
 export function VerticalConfigPanel({
   attributeValueCounts,
+  registerTab,
+  returnRunId,
   sourceTabs,
   verticalConfigs,
 }: {
   attributeValueCounts: Record<string, Record<string, number>>;
+  registerTab?: string;
+  returnRunId?: number;
   sourceTabs: SourceTab[];
   verticalConfigs: VerticalConfig[];
 }) {
@@ -92,6 +98,18 @@ export function VerticalConfigPanel({
   const [savingTab, setSavingTab] = useState<string | null>(null);
   const [tabEdits, setTabEdits] = useState<Record<string, SourceTab>>({});
   const [newVerticalOrder, setNewVerticalOrder] = useState(10);
+  const suggestedPrefix = registerTab
+    ? (verticalConfigs.find(
+        (c) => c.tab_prefix === registerTab.split("_")[0]?.toLowerCase(),
+      )?.tab_prefix ?? "")
+    : "";
+  const [showNewTabForm, setShowNewTabForm] = useState(Boolean(registerTab));
+  const [newTabName, setNewTabName] = useState(registerTab ?? "");
+  const [newTabPrefix, setNewTabPrefix] = useState(suggestedPrefix);
+  const [newTabClient, setNewTabClient] = useState("");
+  const [newTabMarket, setNewTabMarket] = useState("");
+  const [registeringTab, setRegisteringTab] = useState(false);
+  const [registeredReturnRunId, setRegisteredReturnRunId] = useState<number | null>(null);
 
   function beginEdit(config: VerticalConfig) {
     setDraft({
@@ -201,6 +219,37 @@ export function VerticalConfigPanel({
     }));
   }
 
+  async function handleRegisterTab() {
+    if (!newTabName.trim()) {
+      toast.error("Enter a workbook tab name.");
+      return;
+    }
+    setRegisteringTab(true);
+    try {
+      await registerSourceTab({
+        tabName: newTabName.trim(),
+        tabPrefix: newTabPrefix || null,
+        client: newTabClient.trim() || null,
+        market: newTabMarket.trim() || null,
+        active: true,
+      });
+      toast.success(`Assigned tab ${newTabName.trim()}`);
+      if (returnRunId) {
+        setRegisteredReturnRunId(returnRunId);
+      }
+      setShowNewTabForm(false);
+      setNewTabName("");
+      setNewTabPrefix("");
+      setNewTabClient("");
+      setNewTabMarket("");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to register source tab.");
+    } finally {
+      setRegisteringTab(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <Card>
@@ -273,13 +322,90 @@ export function VerticalConfigPanel({
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Source tabs</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Assign workbook tabs to a vertical, client, and market. Inactive tabs are retained in the registry.
-          </p>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <div>
+            <CardTitle>Source tabs</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Assign workbook tabs to a vertical, client, and market. Inactive tabs are retained in the registry.
+            </p>
+          </div>
+          <Button
+            onClick={() => setShowNewTabForm((open) => !open)}
+            size="sm"
+            variant="outline"
+          >
+            {showNewTabForm ? "Cancel" : "Register tab"}
+          </Button>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent className="space-y-4 overflow-x-auto">
+          {registeredReturnRunId && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
+              <span>Tab assigned. Return to Data import to refresh the preview and apply.</span>
+              <Link
+                className="rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-800"
+                href={`/admin?tab=import&run=${registeredReturnRunId}&refresh=1`}
+              >
+                Return to Data import &amp; refresh preview
+              </Link>
+            </div>
+          )}
+          {showNewTabForm && (
+            <div className="grid gap-3 rounded-lg border border-amber-300 bg-amber-50/50 p-4 sm:grid-cols-2 lg:grid-cols-5">
+              <label className="grid gap-1 text-xs font-medium">
+                Tab name
+                <Input
+                  aria-label="New tab name"
+                  onChange={(event) => setNewTabName(event.target.value)}
+                  placeholder="food_clientD_mia"
+                  value={newTabName}
+                />
+              </label>
+              <label className="grid gap-1 text-xs font-medium">
+                Vertical
+                <select
+                  aria-label="New tab vertical"
+                  className="h-8 rounded-lg border border-input bg-background px-2 text-sm"
+                  onChange={(event) => setNewTabPrefix(event.target.value)}
+                  value={newTabPrefix}
+                >
+                  <option value="">Unassigned</option>
+                  {verticalConfigs.map((config) => (
+                    <option key={config.tab_prefix} value={config.tab_prefix}>
+                      {config.vertical}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1 text-xs font-medium">
+                Client (optional)
+                <Input
+                  aria-label="New tab client"
+                  onChange={(event) => setNewTabClient(event.target.value)}
+                  placeholder="Client D"
+                  value={newTabClient}
+                />
+              </label>
+              <label className="grid gap-1 text-xs font-medium">
+                Market (optional)
+                <Input
+                  aria-label="New tab market"
+                  onChange={(event) => setNewTabMarket(event.target.value)}
+                  placeholder="Miami"
+                  value={newTabMarket}
+                />
+              </label>
+              <div className="flex items-end">
+                <Button
+                  className="w-full"
+                  disabled={registeringTab}
+                  onClick={() => void handleRegisterTab()}
+                  size="sm"
+                >
+                  {registeringTab ? "Saving…" : "Assign tab"}
+                </Button>
+              </div>
+            </div>
+          )}
           <table className="w-full min-w-[1040px] text-left text-sm">
             <thead>
               <tr className="border-b">

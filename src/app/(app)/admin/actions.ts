@@ -27,7 +27,7 @@ const inviteSchema = z.object({
 
 const activityFilterSchema = z.object({
   userId: z.uuid().optional(),
-  event: z.enum(["login", "page_view", "deal_edit", "admin_change", "snapshot", "csv_export", "password_set", "config_change"]).optional(),
+  event: z.enum(["login", "page_view", "deal_edit", "admin_change", "snapshot", "csv_export", "password_set", "config_change", "import"]).optional(),
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
   page: z.number().int().min(1).default(1),
@@ -177,6 +177,26 @@ export async function saveSourceTab(input: z.input<typeof sourceTabSchema>) {
     .maybeSingle();
   if (error) throw new Error(`Unable to update source tab: ${error.message}`);
   if (!data) throw new Error(`Source tab ${parsed.tabName} was not found.`);
+
+  revalidateConfigPages();
+  return { ok: true };
+}
+
+export async function registerSourceTab(input: z.input<typeof sourceTabSchema>) {
+  await requireAdmin();
+  const parsed = sourceTabSchema.parse(input);
+  const supabase = await createClient();
+  const { error } = await supabase.from("source_tabs").upsert(
+    {
+      tab_name: parsed.tabName.trim(),
+      tab_prefix: parsed.tabPrefix,
+      client: parsed.client || null,
+      market: parsed.market || null,
+      active: parsed.active,
+    },
+    { onConflict: "tab_name" },
+  );
+  if (error) throw new Error(`Unable to register source tab: ${error.message}`);
 
   revalidateConfigPages();
   return { ok: true };

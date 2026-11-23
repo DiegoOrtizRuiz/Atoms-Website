@@ -188,6 +188,7 @@ describe("buildWeeklyModel attention dates", () => {
       new_value: "In Contract",
       old_value: "Pre LOI",
       seed_source: null,
+      detail: null,
     }));
 
     const model = buildWeeklyModel(

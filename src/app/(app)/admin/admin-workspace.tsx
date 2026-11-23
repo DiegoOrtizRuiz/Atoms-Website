@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,8 @@ import type { Database, Json } from "@/lib/database.types";
 import { fmtDate, fmtNumber, fmtOrDash } from "@/lib/format";
 import { usePresenceMembers } from "@/lib/presence";
 import { ActivityPanel } from "./activity-panel";
+import type { ImportRunRecord } from "./import-actions";
+import { ImportPanel, type ImportRunListItem } from "./import-panel";
 import { VerticalConfigPanel } from "./vertical-config-panel";
 import { UsersPanel } from "./users-panel";
 
@@ -22,9 +24,9 @@ type HealthDeal = Pick<
   Database["public"]["Tables"]["deals"]["Row"],
   "id" | "stage" | "needs_review" | "review_reasons" | "stage_raw" | "field_provenance" | "address"
 >;
-type AdminTab = "overview" | "users" | "activity" | "health" | "verticals";
+type AdminTab = "overview" | "users" | "activity" | "health" | "verticals" | "import";
 
-const adminTabs: AdminTab[] = ["overview", "users", "activity", "health", "verticals"];
+const adminTabs: AdminTab[] = ["overview", "users", "activity", "health", "verticals", "import"];
 function isTab(value?: string): value is AdminTab {
   return Boolean(value && adminTabs.includes(value as AdminTab));
 }
@@ -201,12 +203,17 @@ function DataHealth({
 
 export function AdminWorkspace({
   attributeValueCounts,
+  autoRefreshRunId,
   clients,
   deals,
+  importRuns,
+  initialActiveRun,
   initialTab,
   lastImportAt,
   loginCounts,
   profiles,
+  registerTab,
+  returnRunId,
   sourceTabs,
   user,
   verticals,
@@ -214,12 +221,17 @@ export function AdminWorkspace({
   usage,
 }: {
   attributeValueCounts: Record<string, Record<string, number>>;
+  autoRefreshRunId?: number;
   clients: string[];
   deals: HealthDeal[];
+  importRuns: ImportRunListItem[];
+  initialActiveRun: ImportRunRecord | null;
   initialTab?: string;
   lastImportAt: string | null;
   loginCounts: LoginDay[];
   profiles: Profile[];
+  registerTab?: string;
+  returnRunId?: number;
   sourceTabs: SourceTab[];
   user: CurrentUser;
   verticals: string[];
@@ -228,6 +240,13 @@ export function AdminWorkspace({
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<AdminTab>(isTab(initialTab) ? initialTab : "overview");
+
+  useEffect(() => {
+    if (isTab(initialTab)) {
+      setTab(initialTab);
+    }
+  }, [initialTab]);
+
   return (
     <div className="space-y-5 px-4 pb-8 md:px-8">
       <Tabs
@@ -244,6 +263,7 @@ export function AdminWorkspace({
           <TabsTrigger value="activity">Activity log</TabsTrigger>
           <TabsTrigger value="health">Data health</TabsTrigger>
           <TabsTrigger value="verticals">Verticals &amp; tabs</TabsTrigger>
+          <TabsTrigger value="import">Data import</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="mt-5">
           <Overview
@@ -264,8 +284,18 @@ export function AdminWorkspace({
         <TabsContent value="verticals" className="mt-5">
           <VerticalConfigPanel
             attributeValueCounts={attributeValueCounts}
+            registerTab={registerTab}
+            returnRunId={returnRunId}
             sourceTabs={sourceTabs}
             verticalConfigs={verticalConfigs}
+          />
+        </TabsContent>
+        <TabsContent value="import" className="mt-5">
+          <ImportPanel
+            autoRefreshRunId={autoRefreshRunId}
+            initialActiveRun={initialActiveRun}
+            initialRuns={importRuns}
+            profiles={profiles}
           />
         </TabsContent>
       </Tabs>

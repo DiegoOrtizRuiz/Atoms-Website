@@ -12,6 +12,7 @@ describe("expandHistoryEntry", () => {
     old_value: { zoning: "I-1", doors: 2, nested: { a: 1, b: 2 } },
     new_value: { zoning: "I-2", added: true, nested: { b: 2, a: 1 } },
     seed_source: null,
+    detail: null,
   };
 
   it("expands only changed, added, or removed attribute keys", () => {

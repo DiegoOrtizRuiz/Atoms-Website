@@ -21,6 +21,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 import {
   addVerticalConfig,
   inviteAdminUser,
+  registerSourceTab,
   reorderVerticalConfigs,
   saveSourceTab,
   saveVerticalConfig,
@@ -118,6 +119,15 @@ it("rejects direct admin mutations from a viewer", async () => {
       tabPrefix: "food",
       client: "Client A",
       market: "New York",
+      active: true,
+    }),
+  ).rejects.toThrow("Only administrators can perform this action.");
+  await expect(
+    registerSourceTab({
+      tabName: "food_clientD_mia",
+      tabPrefix: "food",
+      client: "Client D",
+      market: "Miami",
       active: true,
     }),
   ).rejects.toThrow("Only administrators can perform this action.");

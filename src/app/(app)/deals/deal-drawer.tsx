@@ -229,6 +229,14 @@ export function DealDrawer({
               <ol className="space-y-4">
                 {history.map((entry) => {
                   const author = authors.find((person) => person.id === entry.changed_by);
+                  const detailObj =
+                    entry.detail && typeof entry.detail === "object" && !Array.isArray(entry.detail)
+                      ? entry.detail
+                      : null;
+                  const importRunId =
+                    detailObj?.source === "import" && typeof detailObj.run_id === "number"
+                      ? detailObj.run_id
+                      : null;
                   return (
                     <li className="relative border-l border-slate-200 pl-5" key={`${entry.id}:${entry.field}`}>
                       <span className="absolute -left-1.5 top-1 size-3 rounded-full border-2 border-white bg-slate-400" />
@@ -246,6 +254,9 @@ export function DealDrawer({
                       </p>
                       <p className="mt-1 flex items-center gap-2 text-xs text-slate-500">
                         {entry.changed_by ? (author?.full_name ?? "Unavailable user") : "Import"}
+                        {importRunId ? (
+                          <Badge variant="secondary">Import #{importRunId}</Badge>
+                        ) : null}
                         {author?.role ? (
                           <Badge variant="outline">{author.role.replaceAll("_", " ")}</Badge>
                         ) : null}
