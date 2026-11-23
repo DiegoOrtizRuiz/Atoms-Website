@@ -338,24 +338,96 @@ export type Database = {
       }
       vertical_config: {
         Row: {
+          active: boolean
           columns: Json
+          description: string | null
           sort_order: number
           tab_prefix: string
+          updated_at: string
+          updated_by: string | null
           vertical: string
         }
         Insert: {
+          active?: boolean
           columns?: Json
+          description?: string | null
           sort_order: number
           tab_prefix: string
+          updated_at?: string
+          updated_by?: string | null
           vertical: string
         }
         Update: {
+          active?: boolean
           columns?: Json
+          description?: string | null
           sort_order?: number
           tab_prefix?: string
+          updated_at?: string
+          updated_by?: string | null
           vertical?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "vertical_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profile_names"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vertical_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vertical_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "v_user_usage"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      source_tabs: {
+        Row: {
+          active: boolean
+          client: string | null
+          last_imported_at: string | null
+          market: string | null
+          row_count: number | null
+          tab_name: string
+          tab_prefix: string | null
+        }
+        Insert: {
+          active?: boolean
+          client?: string | null
+          last_imported_at?: string | null
+          market?: string | null
+          row_count?: number | null
+          tab_name: string
+          tab_prefix?: string | null
+        }
+        Update: {
+          active?: boolean
+          client?: string | null
+          last_imported_at?: string | null
+          market?: string | null
+          row_count?: number | null
+          tab_name?: string
+          tab_prefix?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_tabs_tab_prefix_fkey"
+            columns: ["tab_prefix"]
+            isOneToOne: false
+            referencedRelation: "vertical_config"
+            referencedColumns: ["tab_prefix"]
+          },
+        ]
       }
       weekly_snapshots: {
         Row: {
@@ -454,6 +526,14 @@ export type Database = {
           day: string
           login_count: number
         }[]
+      }
+      admin_rename_vertical: {
+        Args: { new_vertical: string; old_vertical: string }
+        Returns: undefined
+      }
+      admin_reorder_verticals: {
+        Args: { prefixes: string[] }
+        Returns: undefined
       }
       app_role: {
         Args: never

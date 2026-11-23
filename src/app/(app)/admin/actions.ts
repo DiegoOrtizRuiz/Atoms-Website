@@ -27,10 +27,52 @@ const inviteSchema = z.object({
 
 const activityFilterSchema = z.object({
   userId: z.uuid().optional(),
-  event: z.enum(["login", "page_view", "deal_edit", "admin_change", "snapshot", "csv_export", "password_set"]).optional(),
+  event: z.enum(["login", "page_view", "deal_edit", "admin_change", "snapshot", "csv_export", "password_set", "config_change"]).optional(),
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
   page: z.number().int().min(1).default(1),
+});
+
+const verticalColumnSchema = z.object({
+  key: z.string().regex(/^[a-z][a-z0-9_]*$/),
+  label: z.string().trim().min(1).max(100),
+  type: z.enum(["number", "string", "boolean"]),
+}).strict();
+
+const verticalConfigSchema = z.object({
+  tabPrefix: z.string().regex(/^[a-z][a-z0-9_]*$/),
+  vertical: z.string().trim().min(1).max(100),
+  description: z.string().trim().max(500).nullable(),
+  active: z.boolean(),
+  columns: z.array(verticalColumnSchema).max(100).superRefine((columns, context) => {
+    const keys = new Set<string>();
+    columns.forEach((column, index) => {
+      if (keys.has(column.key)) {
+        context.addIssue({
+          code: "custom",
+          message: `Duplicate attribute key: ${column.key}`,
+          path: [index, "key"],
+        });
+      }
+      keys.add(column.key);
+    });
+  }),
+});
+
+const newVerticalSchema = verticalConfigSchema.extend({
+  sortOrder: z.number().int().min(0).max(100000),
+});
+
+const verticalOrderSchema = z.array(
+  z.string().regex(/^[a-z][a-z0-9_]*$/),
+).max(1000).refine((prefixes) => new Set(prefixes).size === prefixes.length);
+
+const sourceTabSchema = z.object({
+  tabName: z.string().min(1).max(200).refine((value) => value.trim().length > 0),
+  tabPrefix: z.string().regex(/^[a-z][a-z0-9_]*$/).nullable(),
+  client: z.string().trim().max(200).nullable(),
+  market: z.string().trim().max(200).nullable(),
+  active: z.boolean(),
 });
 
 async function requireAdmin() {
@@ -39,6 +81,105 @@ async function requireAdmin() {
     throw new Error("Only administrators can perform this action.");
   }
   return user;
+}
+
+function revalidateConfigPages() {
+  for (const path of ["/admin", "/deals", "/weekly", "/rollup"]) {
+    revalidatePath(path);
+  }
+}
+
+export async function addVerticalConfig(input: z.input<typeof newVerticalSchema>) {
+  await requireAdmin();
+  const parsed = newVerticalSchema.parse(input);
+  const supabase = await createClient();
+  const { error } = await supabase.from("vertical_config").insert({
+    tab_prefix: parsed.tabPrefix,
+    vertical: parsed.vertical,
+    description: parsed.description || null,
+    active: parsed.active,
+    columns: parsed.columns,
+    sort_order: parsed.sortOrder,
+  });
+  if (error) throw new Error(`Unable to add vertical: ${error.message}`);
+
+  revalidateConfigPages();
+  return { ok: true };
+}
+
+export async function saveVerticalConfig(input: z.input<typeof verticalConfigSchema>) {
+  await requireAdmin();
+  const parsed = verticalConfigSchema.parse(input);
+  const supabase = await createClient();
+  const { data: current, error: readError } = await supabase
+    .from("vertical_config")
+    .select("vertical")
+    .eq("tab_prefix", parsed.tabPrefix)
+    .single();
+  if (readError) throw new Error(`Unable to load vertical: ${readError.message}`);
+
+  if (current.vertical !== parsed.vertical) {
+    const { error: renameError } = await supabase.rpc("admin_rename_vertical", {
+      old_vertical: current.vertical,
+      new_vertical: parsed.vertical,
+    });
+    if (renameError) throw new Error(`Unable to rename vertical: ${renameError.message}`);
+  }
+
+  const { data, error } = await supabase
+    .from("vertical_config")
+    .update({
+      description: parsed.description || null,
+      active: parsed.active,
+      columns: parsed.columns,
+    })
+    .eq("tab_prefix", parsed.tabPrefix)
+    .select("tab_prefix")
+    .maybeSingle();
+  if (error) {
+    throw new Error(
+      current.vertical !== parsed.vertical
+        ? `Vertical renamed, but its settings could not be saved: ${error.message}`
+        : `Unable to save vertical settings: ${error.message}`,
+    );
+  }
+  if (!data) throw new Error(`Vertical ${parsed.tabPrefix} was not found.`);
+
+  revalidateConfigPages();
+  return { ok: true };
+}
+
+export async function reorderVerticalConfigs(input: string[]) {
+  await requireAdmin();
+  const prefixes = verticalOrderSchema.parse(input);
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_reorder_verticals", { prefixes });
+  if (error) throw new Error(`Unable to reorder verticals: ${error.message}`);
+
+  revalidateConfigPages();
+  return { ok: true };
+}
+
+export async function saveSourceTab(input: z.input<typeof sourceTabSchema>) {
+  await requireAdmin();
+  const parsed = sourceTabSchema.parse(input);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("source_tabs")
+    .update({
+      tab_prefix: parsed.tabPrefix,
+      client: parsed.client || null,
+      market: parsed.market || null,
+      active: parsed.active,
+    })
+    .eq("tab_name", parsed.tabName)
+    .select("tab_name")
+    .maybeSingle();
+  if (error) throw new Error(`Unable to update source tab: ${error.message}`);
+  if (!data) throw new Error(`Source tab ${parsed.tabName} was not found.`);
+
+  revalidateConfigPages();
+  return { ok: true };
 }
 
 async function validateScopes(verticals: string[], clients: string[]) {

@@ -307,7 +307,32 @@ export function OperationsWorkspace({
     };
     const provenanceParams = { context: { user: uiUser, markAssumption, confirmField } };
     return [
-      { field: "vertical", minWidth: 145, cellRenderer: ProvenanceCell },
+      {
+        field: "vertical",
+        minWidth: 170,
+        cellRenderer: (params: ICellRendererParams<Deal>) => {
+          const inactive =
+            params.data?.vertical &&
+            configsByVertical.get(params.data.vertical)?.active === false;
+          return (
+            <ProvenanceCell
+              {...params}
+              displayValue={
+                inactive ? (
+                  <span className="flex items-center gap-2">
+                    <span>{fmtOrDash(params.value)}</span>
+                    <Badge className="text-[10px] text-slate-500" variant="outline">
+                      Inactive
+                    </Badge>
+                  </span>
+                ) : (
+                  params.value ?? "—"
+                )
+              }
+            />
+          );
+        },
+      },
       { field: "client", minWidth: 115, cellRenderer: ProvenanceCell },
       { field: "market", minWidth: 120, cellRenderer: ProvenanceCell },
       {
@@ -447,7 +472,7 @@ export function OperationsWorkspace({
         valueFormatter: ({ value }) => fmtDate(value, "MMM d, h:mm a"),
       },
     ];
-  }, [confirmField, markAssumption, uiUser]);
+  }, [confirmField, configsByVertical, markAssumption, uiUser]);
 
   const columns = useMemo<ColDef<Deal>[]>(() => {
     if (filters.verticals.length !== 1) return baseColumns;
@@ -460,12 +485,18 @@ export function OperationsWorkspace({
       const definition = raw as { key?: unknown; label?: unknown; type?: unknown };
       if (typeof definition.key !== "string") return [];
       const field = `attributes.${definition.key}`;
-      const moneyColumn = definition.type === "money";
+      const numberColumn = definition.type === "number";
+      const booleanColumn = definition.type === "boolean";
       return [{
         headerName:
           typeof definition.label === "string" ? definition.label : definition.key,
         colId: field,
         minWidth: 125,
+        cellEditor: numberColumn
+          ? "agNumberCellEditor"
+          : booleanColumn
+            ? "agCheckboxCellEditor"
+            : undefined,
         valueGetter: ({ data }: { data?: Deal }) =>
           data ? dealFieldValue(data, field) : undefined,
         valueSetter: ({ data, newValue }) => {
@@ -475,13 +506,21 @@ export function OperationsWorkspace({
           };
           return true;
         },
+        valueParser: numberColumn
+          ? ({ newValue }: { newValue: unknown }) =>
+              newValue === "" || newValue == null ? null : Number(newValue)
+          : undefined,
         editable: ({ data }: { data?: Deal }) => Boolean(data && canEditDeal(uiUser, data)),
         onCellValueChanged: undefined,
         valueFormatter: (params: ValueFormatterParams<Deal>) =>
-          moneyColumn
-            ? money(params.value, 2)
-            : definition.type === "number"
-              ? fmtNumber(params.value as number | string | null)
+          numberColumn
+            ? fmtNumber(params.value as number | string | null)
+            : booleanColumn
+              ? params.value == null
+                ? "—"
+                : params.value
+                  ? "Yes"
+                  : "No"
               : fmtOrDash(params.value),
         cellRenderer: ProvenanceCell,
       }];

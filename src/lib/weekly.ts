@@ -191,7 +191,13 @@ export function buildWeeklyModel(
   showAll: boolean,
   now = new Date(),
 ): WeeklyModel {
-  const selected = deals.filter((deal) => showAll || deal.show_in_weekly);
+  const configByVertical = new Map(
+    configs.map((config) => [config.vertical, config]),
+  );
+  const visibleDeals = deals.filter(
+    (deal) => !deal.vertical || configByVertical.get(deal.vertical)?.active !== false,
+  );
+  const selected = visibleDeals.filter((deal) => showAll || deal.show_in_weekly);
   const configOrder = new Map(
     configs.map((config) => [config.vertical, config.sort_order]),
   );
@@ -218,7 +224,7 @@ export function buildWeeklyModel(
     weekStart: startOfWeek(now, { weekStartsOn: 1 }).toISOString().slice(0, 10),
     sections,
     attention: attentionFor(selected, history, now),
-    allRows: deals.map(buildWeeklyRow),
+    allRows: visibleDeals.map(buildWeeklyRow),
   };
 }
 

@@ -6,9 +6,17 @@ import os
 import openpyxl
 import pytest
 
+import normalize
 from normalize import STAGES, font_key, DEFAULT_FONT_COLORS, main, NON_DEAL_TABS
 
 WB = os.environ.get("WORKBOOK", "data/src.xlsx")
+
+
+@pytest.fixture(scope="module", autouse=True)
+def use_offline_vertical_mapping():
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(normalize, "load_live_vertical_mapping", lambda: None)
+        yield
 
 
 @pytest.fixture(scope="module")
@@ -134,3 +142,51 @@ def test_contact_cross_reference(result):
     contacts = result[1]
     ford = next(c for c in contacts if c["contact_name"] == "James Ford")
     assert ford["linked_deals"] == ["av_clientC_atl:2"]
+
+
+def test_unknown_tab_prefix_is_imported_and_flagged(tmp_path, monkeypatch):
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "unknown_market"
+    sheet.append(
+        [
+            "Client",
+            "Metro",
+            "City",
+            "State",
+            "Address",
+            "Status",
+            "Bldg SF",
+            "List Price",
+            "Lot SF",
+            "Broker",
+            "Phone",
+            "Notes",
+        ]
+    )
+    sheet.append(
+        [
+            "Client A",
+            "Seattle",
+            "Seattle",
+            "WA",
+            "1 Test St",
+            "Sourcing",
+            1000,
+            100000,
+            5000,
+            "Test Broker",
+            "555-0100",
+            None,
+        ]
+    )
+    path = tmp_path / "unknown.xlsx"
+    workbook.save(path)
+
+    deals, _, report = main(path, tmp_path / "out")
+
+    assert len(deals) == 1
+    assert deals[0]["vertical"] is None
+    assert deals[0]["unconfigured_tab"] is True
+    assert deals[0]["needs_review"] is True
+    assert "unknown_market" in report["unconfigured_tabs"]

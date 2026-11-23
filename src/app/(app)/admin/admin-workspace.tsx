@@ -10,18 +10,21 @@ import type { Database, Json } from "@/lib/database.types";
 import { fmtDate, fmtNumber, fmtOrDash } from "@/lib/format";
 import { usePresenceMembers } from "@/lib/presence";
 import { ActivityPanel } from "./activity-panel";
+import { VerticalConfigPanel } from "./vertical-config-panel";
 import { UsersPanel } from "./users-panel";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type Usage = Database["public"]["Views"]["v_user_usage"]["Row"];
+type VerticalConfig = Database["public"]["Tables"]["vertical_config"]["Row"];
+type SourceTab = Database["public"]["Tables"]["source_tabs"]["Row"];
 type LoginDay = Database["public"]["Functions"]["admin_logins_per_day"]["Returns"][number];
 type HealthDeal = Pick<
   Database["public"]["Tables"]["deals"]["Row"],
   "id" | "stage" | "needs_review" | "review_reasons" | "stage_raw" | "field_provenance" | "address"
 >;
-type AdminTab = "overview" | "users" | "activity" | "health";
+type AdminTab = "overview" | "users" | "activity" | "health" | "verticals";
 
-const adminTabs: AdminTab[] = ["overview", "users", "activity", "health"];
+const adminTabs: AdminTab[] = ["overview", "users", "activity", "health", "verticals"];
 function isTab(value?: string): value is AdminTab {
   return Boolean(value && adminTabs.includes(value as AdminTab));
 }
@@ -197,24 +200,30 @@ function DataHealth({
 }
 
 export function AdminWorkspace({
+  attributeValueCounts,
   clients,
   deals,
   initialTab,
   lastImportAt,
   loginCounts,
   profiles,
+  sourceTabs,
   user,
   verticals,
+  verticalConfigs,
   usage,
 }: {
+  attributeValueCounts: Record<string, Record<string, number>>;
   clients: string[];
   deals: HealthDeal[];
   initialTab?: string;
   lastImportAt: string | null;
   loginCounts: LoginDay[];
   profiles: Profile[];
+  sourceTabs: SourceTab[];
   user: CurrentUser;
   verticals: string[];
+  verticalConfigs: VerticalConfig[];
   usage: Usage[];
 }) {
   const router = useRouter();
@@ -229,11 +238,12 @@ export function AdminWorkspace({
           router.replace(`/admin?tab=${value}`, { scroll: false });
         }}
       >
-        <TabsList className="flex w-full max-w-2xl">
+        <TabsList className="flex w-full flex-wrap">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="users">Users &amp; permissions</TabsTrigger>
           <TabsTrigger value="activity">Activity log</TabsTrigger>
           <TabsTrigger value="health">Data health</TabsTrigger>
+          <TabsTrigger value="verticals">Verticals &amp; tabs</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="mt-5">
           <Overview
@@ -250,6 +260,13 @@ export function AdminWorkspace({
         </TabsContent>
         <TabsContent value="health" className="mt-5">
           <DataHealth deals={deals} lastImportAt={lastImportAt} />
+        </TabsContent>
+        <TabsContent value="verticals" className="mt-5">
+          <VerticalConfigPanel
+            attributeValueCounts={attributeValueCounts}
+            sourceTabs={sourceTabs}
+            verticalConfigs={verticalConfigs}
+          />
         </TabsContent>
       </Tabs>
     </div>

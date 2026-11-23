@@ -41,12 +41,11 @@ export default async function RollupPage() {
   const supabase = await createClient();
   const [rollup, verticals, oldDeals, contacts] = await Promise.all([
     supabase.from("v_stage_rollup").select("vertical, stage, deal_count"),
-    supabase.from("vertical_config").select("vertical").order("sort_order"),
+    supabase.from("vertical_config").select("vertical, active").order("sort_order"),
     supabase
       .from("deals")
       .select("id, vertical, market, address, stage, stage_entered_at")
-      .order("stage_entered_at", { ascending: true })
-      .limit(10),
+      .order("stage_entered_at", { ascending: true }),
     supabase
       .from("contacts")
       .select("id, contact_name, title, email, linked_deals, attributes")
@@ -71,7 +70,16 @@ export default async function RollupPage() {
     stages.set(key, (stages.get(key) ?? 0) + (row.deal_count ?? 0));
   }
 
-  const verticalOrder = (verticals.data ?? []).map((item) => item.vertical);
+  const configuredVerticals = verticals.data ?? [];
+  const inactiveVerticals = new Set(
+    configuredVerticals.filter((item) => !item.active).map((item) => item.vertical),
+  );
+  const verticalOrder = configuredVerticals
+    .filter((item) => item.active)
+    .map((item) => item.vertical);
+  const longestInStage = (oldDeals.data ?? [])
+    .filter((deal) => !deal.vertical || !inactiveVerticals.has(deal.vertical))
+    .slice(0, 10);
   const contactsList = contacts.data ?? [];
   const outreach = contactsList.map((contact) => ({
     ...contact,
@@ -142,7 +150,7 @@ export default async function RollupPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(oldDeals.data ?? []).map((deal) => {
+                  {longestInStage.map((deal) => {
                     const days = Math.max(0, Math.floor((now - new Date(deal.stage_entered_at).getTime()) / 86400000));
                     const old = days > 30;
                     return (
@@ -158,7 +166,7 @@ export default async function RollupPage() {
                       </TableRow>
                     );
                   })}
-                  {oldDeals.data?.length === 0 && <TableRow><TableCell colSpan={3}>No deals found.</TableCell></TableRow>}
+                  {longestInStage.length === 0 && <TableRow><TableCell colSpan={3}>No deals found.</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </CardContent>

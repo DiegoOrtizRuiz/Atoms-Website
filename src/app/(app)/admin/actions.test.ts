@@ -18,7 +18,14 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-import { inviteAdminUser, updateAdminProfile } from "./actions";
+import {
+  addVerticalConfig,
+  inviteAdminUser,
+  reorderVerticalConfigs,
+  saveSourceTab,
+  saveVerticalConfig,
+  updateAdminProfile,
+} from "./actions";
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -82,6 +89,87 @@ it("rejects direct admin mutations from a viewer", async () => {
       clients: [],
     }),
   ).rejects.toThrow("Only administrators can perform this action.");
+
+  await expect(
+    saveVerticalConfig({
+      tabPrefix: "food",
+      vertical: "Food",
+      description: "",
+      active: true,
+      columns: [],
+    }),
+  ).rejects.toThrow("Only administrators can perform this action.");
+  await expect(
+    addVerticalConfig({
+      tabPrefix: "new_vertical",
+      vertical: "New vertical",
+      description: "",
+      active: true,
+      columns: [],
+      sortOrder: 40,
+    }),
+  ).rejects.toThrow("Only administrators can perform this action.");
+  await expect(reorderVerticalConfigs(["food"])).rejects.toThrow(
+    "Only administrators can perform this action.",
+  );
+  await expect(
+    saveSourceTab({
+      tabName: "food_clientA",
+      tabPrefix: "food",
+      client: "Client A",
+      market: "New York",
+      active: true,
+    }),
+  ).rejects.toThrow("Only administrators can perform this action.");
+  expect(mocks.createClient).not.toHaveBeenCalled();
+});
+
+it("rejects duplicate dynamic attribute keys", async () => {
+  mocks.requireUser.mockResolvedValue({
+    id: "00000000-0000-4000-8000-000000000001",
+    role: "admin",
+  });
+
+  await expect(
+    addVerticalConfig({
+      tabPrefix: "new_vertical",
+      vertical: "New vertical",
+      description: "",
+      active: true,
+      columns: [
+        { key: "sprinkler", label: "Sprinkler", type: "string" },
+        { key: "sprinkler", label: "Sprinkler status", type: "boolean" },
+      ],
+      sortOrder: 40,
+    }),
+  ).rejects.toThrow("Duplicate attribute key: sprinkler");
+  expect(mocks.createClient).not.toHaveBeenCalled();
+});
+
+it("reports a missing source tab instead of showing a false save success", async () => {
+  mocks.requireUser.mockResolvedValue({
+    id: "00000000-0000-4000-8000-000000000001",
+    role: "admin",
+  });
+  const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+  const query = {
+    update: vi.fn(() => query),
+    eq: vi.fn(() => query),
+    select: vi.fn(() => query),
+    maybeSingle,
+  };
+  mocks.createClient.mockResolvedValue({ from: () => query });
+
+  await expect(
+    saveSourceTab({
+      tabName: "unknown_tab",
+      tabPrefix: "food",
+      client: null,
+      market: null,
+      active: true,
+    }),
+  ).rejects.toThrow("Source tab unknown_tab was not found.");
+  expect(maybeSingle).toHaveBeenCalledOnce();
 });
 
 it("prevents an administrator from demoting their own account", async () => {

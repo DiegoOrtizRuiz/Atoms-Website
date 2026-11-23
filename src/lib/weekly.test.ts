@@ -42,6 +42,57 @@ function makeDeal(overrides: Partial<Deal>): Deal {
 }
 
 describe("buildWeeklyModel attention dates", () => {
+  it("uses configured order and omits inactive verticals from weekly output", () => {
+    const model = buildWeeklyModel(
+      [
+        makeDeal({ id: "inactive", vertical: "Hidden", address: "Hidden deal" }),
+        makeDeal({ id: "second", vertical: "Second", address: "Second deal" }),
+        makeDeal({ id: "first", vertical: "First", address: "First deal" }),
+      ],
+      [
+        {
+          active: true,
+          columns: [],
+          description: null,
+          sort_order: 20,
+          tab_prefix: "second",
+          updated_at: "2026-11-19T00:00:00.000Z",
+          updated_by: null,
+          vertical: "Second",
+        },
+        {
+          active: false,
+          columns: [],
+          description: null,
+          sort_order: 10,
+          tab_prefix: "hidden",
+          updated_at: "2026-11-19T00:00:00.000Z",
+          updated_by: null,
+          vertical: "Hidden",
+        },
+        {
+          active: true,
+          columns: [],
+          description: null,
+          sort_order: 30,
+          tab_prefix: "first",
+          updated_at: "2026-11-19T00:00:00.000Z",
+          updated_by: null,
+          vertical: "First",
+        },
+      ],
+      [],
+      true,
+      new Date("2026-11-19T00:00:00.000Z"),
+    );
+
+    expect(model.sections.map((section) => section.vertical)).toEqual([
+      "Second",
+      "First",
+    ]);
+    expect(model.allRows.map((row) => row.vertical)).toEqual(["Second", "First"]);
+  });
+
   it("uses LLM iso_guess, supports legacy dates, and ignores null guesses", () => {
     const deal = makeDeal({
       created_at: "2026-11-01T00:00:00.000Z",

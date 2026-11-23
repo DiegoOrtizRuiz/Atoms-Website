@@ -6,6 +6,7 @@ from seed import (
     STAGES,
     activity_rows,
     demo_users,
+    missing_vertical_configs,
     prepare_deals,
     prepare_contacts,
     preserve_deal_creation_dates,
@@ -81,6 +82,12 @@ def test_seed_preserves_existing_deal_creation_dates(deals):
 
     assert prepared[2]["created_at"] == "2025-01-01T00:00:00+00:00"
     assert prepared[0]["created_at"] == prepared[0]["stage_entered_at"]
+
+
+def test_seed_only_inserts_missing_vertical_config_defaults():
+    missing = missing_vertical_configs({"food", "av", "custom"})
+
+    assert [row["tab_prefix"] for row in missing] == ["catering"]
 
 
 def test_demo_users_have_expected_role_counts_and_named_accounts(deals):

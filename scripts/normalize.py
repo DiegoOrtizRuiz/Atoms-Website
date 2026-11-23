@@ -12,11 +12,13 @@ Principles (see PROCESS_LOG):
   * Font colour != default  ->  that cell is an *assumption* (not yet confirmed).
 """
 import json
+import os
 import re
 import sys
 from pathlib import Path
 
 import openpyxl
+from dotenv import load_dotenv
 
 # ---------------------------------------------------------------- config
 # The brief mentions a config tab mapping tabs -> verticals, but the file has none.
@@ -123,14 +125,67 @@ def font_key(cell):
     return (c.type, c.indexed)
 
 
-def vertical_for(tab):
-    prefix = tab.split("_")[0].lower()
-    return VERTICAL_CONFIG.get(prefix)
+def load_live_vertical_mapping():
+    root = Path(__file__).resolve().parents[1]
+    load_dotenv(root / ".env.local")
+    url = os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+    service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if not url and not service_key:
+        return None
+    if not url or not service_key:
+        raise RuntimeError(
+            "Live importer mapping requires both NEXT_PUBLIC_SUPABASE_URL and "
+            "SUPABASE_SERVICE_ROLE_KEY."
+        )
+
+    import httpx
+    from postgrest.exceptions import APIError
+    from supabase import create_client
+
+    try:
+        client = create_client(url, service_key)
+        vertical_rows = (
+            client.table("vertical_config")
+            .select("tab_prefix, vertical")
+            .execute()
+            .data
+        )
+        tab_rows = (
+            client.table("source_tabs")
+            .select("tab_name, tab_prefix")
+            .execute()
+            .data
+        )
+    except (APIError, httpx.HTTPError, ValueError) as exc:
+        raise RuntimeError(
+            "Unable to load importer mappings from Supabase; check the schema "
+            "and Supabase credentials."
+        ) from exc
+
+    verticals = {
+        row["tab_prefix"]: row["vertical"]
+        for row in vertical_rows
+        if row.get("tab_prefix") and row.get("vertical")
+    }
+    source_tabs = {
+        row["tab_name"]: row.get("tab_prefix")
+        for row in tab_rows
+        if row.get("tab_name")
+    }
+    return verticals, source_tabs
+
+
+def resolve_vertical(tab, vertical_mapping, source_tabs):
+    prefix = source_tabs[tab] if tab in source_tabs else tab.split("_")[0].lower()
+    return vertical_mapping.get(prefix) if prefix else None
 
 
 # ---------------------------------------------------------------- deal tabs
-def parse_deal_tab(ws, report):
-    vertical = vertical_for(ws.title)
+def parse_deal_tab(
+    ws, report, vertical_mapping=VERTICAL_CONFIG, source_tabs=None
+):
+    source_tabs = source_tabs or {}
+    vertical = resolve_vertical(ws.title, vertical_mapping, source_tabs)
     headers = [norm_header(c.value) for c in ws[1]]
     lookup = {}
     for canon, aliases in CORE_COLUMNS.items():
@@ -164,6 +219,8 @@ def parse_deal_tab(ws, report):
         stage = STATUS_MAP.get(norm_header(stage_raw)) if stage_raw else None
         if stage is None:
             reasons.append(f"unmapped status: {stage_raw!r}")
+        if vertical is None:
+            reasons.append(f"unconfigured tab: {ws.title}")
 
         city = clean_str(get("city"))
         state = clean_str(get("state"))
@@ -214,6 +271,7 @@ def parse_deal_tab(ws, report):
             "id": f"{ws.title}:{r_idx}",
             "source_tab": ws.title, "source_row": r_idx,
             "vertical": vertical,
+            "unconfigured_tab": vertical is None,
             "client": clean_str(get("client")),
             "market": clean_str(get("market")),
             "city": city, "state": state, "state_inferred": state_inferred,
@@ -265,18 +323,30 @@ def link_contacts(deals, contacts):
 
 def main(path, out_dir="."):
     wb = openpyxl.load_workbook(path)
-    report = {"source": Path(path).name, "tabs": [], "unconfigured_tabs": []}
+    live_mapping = load_live_vertical_mapping()
+    if live_mapping is None:
+        vertical_mapping, source_tabs = VERTICAL_CONFIG, {}
+        mapping_source = "offline_fallback"
+    else:
+        vertical_mapping, source_tabs = live_mapping
+        mapping_source = "supabase"
+    report = {
+        "source": Path(path).name,
+        "mapping_source": mapping_source,
+        "tabs": [],
+        "unconfigured_tabs": [],
+    }
     deals, contacts = [], []
     for ws in wb.worksheets:
         if ws.title == "contact_tracker":
             contacts = parse_contacts(ws)
         elif ws.title in NON_DEAL_TABS:
             continue
-        elif vertical_for(ws.title) is None:
+        elif resolve_vertical(ws.title, vertical_mapping, source_tabs) is None:
             report["unconfigured_tabs"].append(ws.title)  # imported anyway, flagged
-            deals += parse_deal_tab(ws, report)
+            deals += parse_deal_tab(ws, report, vertical_mapping, source_tabs)
         else:
-            deals += parse_deal_tab(ws, report)
+            deals += parse_deal_tab(ws, report, vertical_mapping, source_tabs)
     link_contacts(deals, contacts)
 
     report["totals"] = {

@@ -108,12 +108,12 @@ def vertical_configs() -> list[dict[str, Any]]:
             "vertical": "Autonomous Vehicle",
             "sort_order": 20,
             "columns": [
-                column("zoning", "Zoning", "text"),
+                column("zoning", "Zoning", "string"),
                 column("clear_height_ft", "Clear height", "number"),
                 column("dock_high_doors", "Dock-high doors", "number"),
                 column("power_amps", "Power", "number"),
-                column("property_type", "Property type", "text"),
-                column("listing_status", "Listing status", "text"),
+                column("property_type", "Property type", "string"),
+                column("listing_status", "Listing status", "string"),
                 column("days_on_market", "Days on market", "number"),
             ],
         },
@@ -122,15 +122,15 @@ def vertical_configs() -> list[dict[str, Any]]:
             "vertical": "Airline Catering",
             "sort_order": 30,
             "columns": [
-                column("zoning", "Zoning", "text"),
+                column("zoning", "Zoning", "string"),
                 column("miles_from_airport", "Miles from airport", "number"),
                 column("clear_height_ft", "Clear height", "number"),
                 column("dock_high_doors", "Dock-high doors", "number"),
                 column("grade_level_doors", "Grade-level doors", "number"),
                 column("power_amps", "Power", "number"),
-                column("rent_per_sf", "Rent/SF", "money"),
-                column("property_type", "Property type", "text"),
-                column("listing_status", "Listing status", "text"),
+                column("rent_per_sf", "Rent/SF", "number"),
+                column("property_type", "Property type", "string"),
+                column("listing_status", "Listing status", "string"),
                 column("days_on_market", "Days on market", "number"),
             ],
         },
@@ -429,6 +429,37 @@ def upsert_rows(
         )
 
 
+def missing_vertical_configs(existing_prefixes: set[str]) -> list[dict[str, Any]]:
+    return [
+        row
+        for row in vertical_configs()
+        if row["tab_prefix"] not in existing_prefixes
+    ]
+
+
+def ensure_vertical_configs(client: Client) -> int:
+    existing_rows = response_rows(
+        client.table("vertical_config").select("tab_prefix").execute()
+    )
+    existing_prefixes = {row["tab_prefix"] for row in existing_rows}
+    missing_rows = missing_vertical_configs(existing_prefixes)
+    if missing_rows:
+        response_rows(client.table("vertical_config").insert(missing_rows).execute())
+
+    response = (
+        client.table("vertical_config")
+        .select("tab_prefix", count="exact", head=True)
+        .execute()
+    )
+    error = getattr(response, "error", None)
+    if error:
+        raise RuntimeError(str(error))
+    count = getattr(response, "count", None)
+    if count is None:
+        raise RuntimeError("Supabase returned no vertical configuration count.")
+    return count
+
+
 def preserve_deal_creation_dates(
     deals: list[dict[str, Any]], existing_rows: list[dict[str, Any]]
 ) -> None:
@@ -535,7 +566,7 @@ def run() -> None:
     user_specs = demo_users(deals)
 
     client = create_client(url, service_key)
-    upsert_rows(client, "vertical_config", vertical_configs(), "tab_prefix")
+    vertical_config_count = ensure_vertical_configs(client)
     existing_rows = []
     for offset in range(0, len(deals), 100):
         ids = [deal["id"] for deal in deals[offset : offset + 100]]
@@ -567,7 +598,7 @@ def run() -> None:
     counts = reconcile(
         client,
         {
-            "vertical_config": 3,
+            "vertical_config": vertical_config_count,
             "deals": len(deals),
             "contacts": len(contacts),
             "profiles": 25,
@@ -577,6 +608,7 @@ def run() -> None:
     print("Seed reconciliation passed:")
     print(f"  source: {deals_path.relative_to(ROOT)}")
     print(f"  deals: {len(deals)} JSON = {counts['deals']} DB")
+    print(f"  vertical configs: {counts['vertical_config']} DB")
     print(f"  contacts: {len(contacts)} JSON = {counts['contacts']} DB")
     print(f"  users/profiles: {counts['profiles']} ({dict(role_counts)})")
     print(f"  generated activity: {len(activity)}")
