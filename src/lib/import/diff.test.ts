@@ -48,6 +48,13 @@ function normalizedToExistingDeal(deal: NormalizedDeal): Deal {
     created_at: "2026-11-19T12:00:00.000Z",
     updated_at: "2026-11-19T12:00:00.000Z",
     updated_by: null,
+    lat: null,
+    lng: null,
+    geocode_status: null,
+    geocode_source: null,
+    geocoded_at: null,
+    census_tract_geoid: null,
+    geocoded_address: null,
   };
 }
 

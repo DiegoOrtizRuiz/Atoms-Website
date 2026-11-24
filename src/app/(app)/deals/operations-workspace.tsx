@@ -15,7 +15,7 @@ import {
 } from "ag-grid-community";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-quartz.css";
-import { CircleAlert, Users } from "lucide-react";
+import { CircleAlert, Map as MapIcon, Table2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
@@ -30,7 +30,9 @@ import {
   type VerticalConfig,
 } from "@/lib/deals";
 import { fmtDate, fmtMoney, fmtNumber, fmtOrDash } from "@/lib/format";
+import type { TractDemographicsRow } from "@/lib/geo/acs";
 import { usePresenceMembers } from "@/lib/presence";
+import { stageStyleFor } from "@/lib/stage-colors";
 import { createClient } from "@/lib/supabase/client";
 import {
   confirmDealField,
@@ -38,6 +40,7 @@ import {
   updateDeal,
 } from "./actions";
 import { DealDrawer } from "./deal-drawer";
+import { DealsMap } from "./deals-map";
 import {
   FilterControls,
   type DealFilters,
@@ -71,6 +74,9 @@ export function OperationsWorkspace({
   initialDealId,
   initialConfigs,
   initialFilters,
+  initialTractDemographics = {},
+  initialView = "grid",
+  mapsApiKey,
   effectiveRole,
   user,
 }: {
@@ -78,6 +84,9 @@ export function OperationsWorkspace({
   initialDealId?: string;
   initialConfigs: VerticalConfig[];
   initialFilters: DealFilters;
+  initialTractDemographics?: Record<string, TractDemographicsRow>;
+  initialView?: "grid" | "map";
+  mapsApiKey?: string;
   effectiveRole: CurrentUser["role"];
   user: CurrentUser;
 }) {
@@ -85,6 +94,8 @@ export function OperationsWorkspace({
   const uiUser = useMemo(() => ({ ...user, role: effectiveRole }), [effectiveRole, user]);
   const [deals, setDeals] = useState(initialDeals);
   const [filters, setFilters] = useState(initialFilters);
+  const [view, setView] = useState<"grid" | "map">(initialView);
+  const [tractDemographics, setTractDemographics] = useState(initialTractDemographics);
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const openedQueryDeal = useRef<string | null>(null);
@@ -156,6 +167,24 @@ export function OperationsWorkspace({
     setDeals((rows) => rows.map((row) => (row.id === deal.id ? deal : row)));
     setSelectedDeal((selected) => (selected?.id === deal.id ? deal : selected));
     gridApi.current?.applyTransactionAsync({ update: [deal] });
+    if (deal.census_tract_geoid) {
+      const geoid = deal.census_tract_geoid;
+      setTractDemographics((current) => {
+        if (current[geoid]) return current;
+        const supabase = createClient();
+        void supabase
+          .from("tract_demographics")
+          .select("*")
+          .eq("geoid", geoid)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (data) {
+              setTractDemographics((prev) => ({ ...prev, [geoid]: data }));
+            }
+          });
+        return current;
+      });
+    }
   }, []);
 
   const handleMutation = useCallback(
@@ -191,20 +220,36 @@ export function OperationsWorkspace({
     [handleMutation],
   );
 
-  const setFiltersAndUrl = useCallback(
-    (next: DealFilters) => {
-      setFilters(next);
+  const syncUrl = useCallback(
+    (nextFilters: DealFilters, nextView: "grid" | "map") => {
       const params = new URLSearchParams();
-      if (next.clients.length) params.set("client", next.clients.join(","));
-      if (next.verticals.length) params.set("vertical", next.verticals.join(","));
-      if (next.markets.length) params.set("market", next.markets.join(","));
-      if (next.stages.length) params.set("stage", next.stages.join(","));
-      if (next.needsReview) params.set("needsReview", "true");
-      if (next.hasAssumptions) params.set("assumptions", "true");
+      if (nextFilters.clients.length) params.set("client", nextFilters.clients.join(","));
+      if (nextFilters.verticals.length) params.set("vertical", nextFilters.verticals.join(","));
+      if (nextFilters.markets.length) params.set("market", nextFilters.markets.join(","));
+      if (nextFilters.stages.length) params.set("stage", nextFilters.stages.join(","));
+      if (nextFilters.needsReview) params.set("needsReview", "true");
+      if (nextFilters.hasAssumptions) params.set("assumptions", "true");
+      if (nextView === "map") params.set("view", "map");
       const query = params.toString();
       router.replace(query ? `/deals?${query}` : "/deals", { scroll: false });
     },
     [router],
+  );
+
+  const setFiltersAndUrl = useCallback(
+    (next: DealFilters) => {
+      setFilters(next);
+      syncUrl(next, view);
+    },
+    [syncUrl, view],
+  );
+
+  const setViewAndUrl = useCallback(
+    (nextView: "grid" | "map") => {
+      setView(nextView);
+      syncUrl(filters, nextView);
+    },
+    [filters, syncUrl],
   );
 
   useEffect(() => {
@@ -372,21 +417,10 @@ export function OperationsWorkspace({
           data?.stage_raw && data.stage_raw !== data.stage ? `Source: ${data.stage_raw}` : "",
         cellRenderer: (params: ICellRendererParams<Deal>) => {
           const value = params.value ?? "Needs review";
-          const colors: Record<string, string> = {
-            Sourcing: "bg-slate-100 text-slate-700",
-            "In Pipeline": "bg-sky-100 text-sky-800",
-            "Pre LOI": "bg-cyan-100 text-cyan-800",
-            "Negotiating LOI": "bg-indigo-100 text-indigo-800",
-            "Negotiating PSA": "bg-violet-100 text-violet-800",
-            "In Contract": "bg-amber-100 text-amber-800",
-            Closed: "bg-emerald-100 text-emerald-800",
-            "On Hold": "bg-zinc-200 text-zinc-700",
-            "Needs review": "bg-red-100 text-red-800",
-          };
           return (
             <ProvenanceCell
               {...params}
-              displayValue={<Badge className={colors[value]}>{value}</Badge>}
+              displayValue={<Badge className={stageStyleFor(value).badgeClass}>{value}</Badge>}
             />
           );
         },
@@ -588,13 +622,49 @@ export function OperationsWorkspace({
 
       <div className="flex-1 p-4 lg:p-6">
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-            <p className="text-xs text-slate-500">
-              <strong className="font-semibold text-slate-700">
-                {filteredDeals.length}
-              </strong>{" "}
-              of {deals.length} deals
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <div
+                aria-label="Operations view mode"
+                className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs"
+                role="tablist"
+              >
+                <button
+                  aria-selected={view === "grid"}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition ${
+                    view === "grid"
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                  onClick={() => setViewAndUrl("grid")}
+                  role="tab"
+                  type="button"
+                >
+                  <Table2 className="size-3.5" />
+                  Grid
+                </button>
+                <button
+                  aria-selected={view === "map"}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition ${
+                    view === "map"
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                  onClick={() => setViewAndUrl("map")}
+                  role="tab"
+                  type="button"
+                >
+                  <MapIcon className="size-3.5" />
+                  Map
+                </button>
+              </div>
+              <p className="text-xs text-slate-500">
+                <strong className="font-semibold text-slate-700">
+                  {filteredDeals.length}
+                </strong>{" "}
+                of {deals.length} deals
+              </p>
+            </div>
             <div className="flex items-center gap-4 text-[11px] text-slate-400">
               <span className="flex items-center gap-1.5">
                 <span className="size-1.5 rounded-full bg-amber-500" /> Assumed
@@ -604,41 +674,56 @@ export function OperationsWorkspace({
               </span>
             </div>
           </div>
-          <div className="ag-theme-quartz h-[calc(100vh-330px)] min-h-[480px] w-full">
-            <AgGridReact<Deal>
-              animateRows
-              columnDefs={columns}
-              context={gridContext}
-              defaultColDef={{
-                resizable: true,
-                sortable: true,
-                tooltipComponent: undefined,
+          {view === "map" ? (
+            <DealsMap
+              configsByVertical={configsByVertical}
+              deals={filteredDeals}
+              mapsApiKey={mapsApiKey}
+              onSelectDeal={(deal) => {
+                setSelectedDeal(deal);
+                setDrawerOpen(true);
               }}
-              enableCellTextSelection
-              getRowClass={({ data }) =>
-                data && changedRows.has(data.id) ? "remote-deal-change" : undefined
-              }
-              getRowId={({ data }) => data.id}
-              onCellValueChanged={handleCellChange}
-              onGridReady={({ api }) => {
-                gridApi.current = api;
-              }}
-              onGridPreDestroyed={() => {
-                gridApi.current = null;
-              }}
-              rowData={filteredDeals}
-              rowHeight={52}
-              suppressCellFocus={false}
-              theme="legacy"
+              tractDemographics={tractDemographics}
             />
-          </div>
+          ) : (
+            <div className="ag-theme-quartz h-[calc(100vh-330px)] min-h-[480px] w-full">
+              <AgGridReact<Deal>
+                animateRows
+                columnDefs={columns}
+                context={gridContext}
+                defaultColDef={{
+                  resizable: true,
+                  sortable: true,
+                  tooltipComponent: undefined,
+                }}
+                enableCellTextSelection
+                getRowClass={({ data }) =>
+                  data && changedRows.has(data.id) ? "remote-deal-change" : undefined
+                }
+                getRowId={({ data }) => data.id}
+                onCellValueChanged={handleCellChange}
+                onGridReady={({ api }) => {
+                  gridApi.current = api;
+                }}
+                onGridPreDestroyed={() => {
+                  gridApi.current = null;
+                }}
+                rowData={filteredDeals}
+                rowHeight={52}
+                suppressCellFocus={false}
+                theme="legacy"
+              />
+            </div>
+          )}
         </div>
       </div>
 
       <DealDrawer
         deal={selectedDeal}
+        onDealUpdated={replaceDeal}
         onOpenChange={setDrawerOpen}
         open={drawerOpen}
+        user={uiUser}
       />
       <style jsx global>{`
         .ag-theme-quartz .remote-deal-change .ag-cell {

@@ -235,6 +235,26 @@ locally. Place the Supabase project and Vercel functions in the same region when
 possible. Configure the `APP_URL` GitHub Actions variable after the first
 production deployment so the keepalive workflow can reach `/api/health`.
 
+### Google Maps & tract demographics (Phase 16)
+
+- Property geocoding uses the US Census Geocoder (`geographies/onelineaddress`)
+  and tract demographics use the US Census ACS 5-year API (`CENSUS_ACS_YEAR`,
+  default `2023`, optional `CENSUS_API_KEY`), both server-side and cached in
+  Supabase. No API key is required for geocoding or demographics.
+- Optionally set `GOOGLE_GEOCODING_KEY` (server-only) as a fallback for
+  addresses missed by the Census Geocoder.
+- To render the interactive Google Map on `/deals?view=map`, set
+  `NEXT_PUBLIC_GOOGLE_MAPS_KEY` in `.env.local` and Vercel environment settings:
+  - Enable the **Maps JavaScript API** on your Google Cloud project (**billing
+    must be enabled** on the Google Cloud project for the Maps JavaScript API to
+    load).
+  - Restrict `NEXT_PUBLIC_GOOGLE_MAPS_KEY` by **HTTP referrer** to your
+    production domain (e.g. `https://atoms-website-three.vercel.app/*`) and
+    `http://localhost:3000/*`.
+  - If `NEXT_PUBLIC_GOOGLE_MAPS_KEY` is omitted, `/deals?view=map` still renders
+    cleanly with a fallback placeholder, geocoded site summary, and the
+    **Not on map** list.
+
 ## Seed data
 
 Place the source workbook at `data/src.xlsx`, install the Python requirements,

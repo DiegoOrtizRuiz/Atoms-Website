@@ -17,6 +17,17 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
 }));
+vi.mock("@/lib/geo/service", () => ({
+  geocodeMissingDeals: vi.fn().mockResolvedValue({
+    processed: 0,
+    ok: 0,
+    no_address: 0,
+    not_found: 0,
+    error: 0,
+    cached: 0,
+    tractGeoids: [],
+  }),
+}));
 
 import {
   applyImportRun,

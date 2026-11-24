@@ -17,9 +17,21 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: mocks.createClient,
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/geo/service", () => ({
+  geocodeMissingDeals: vi.fn().mockResolvedValue({
+    processed: 0,
+    ok: 0,
+    no_address: 0,
+    not_found: 0,
+    error: 0,
+    cached: 0,
+    tractGeoids: [],
+  }),
+}));
 
 import {
   addVerticalConfig,
+  geocodeMissingAdminDeals,
   inviteAdminUser,
   registerSourceTab,
   reorderVerticalConfigs,
@@ -131,6 +143,9 @@ it("rejects direct admin mutations from a viewer", async () => {
       active: true,
     }),
   ).rejects.toThrow("Only administrators can perform this action.");
+  await expect(geocodeMissingAdminDeals()).rejects.toThrow(
+    "Only administrators can perform this action.",
+  );
   expect(mocks.createClient).not.toHaveBeenCalled();
 });
 

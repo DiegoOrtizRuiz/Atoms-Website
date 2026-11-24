@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { OperationsWorkspace } from "./operations-workspace";
 import { requireUser } from "@/lib/auth";
 import { effectiveRole } from "@/lib/effective-role";
+import type { TractDemographicsRow } from "@/lib/geo/acs";
 import { createClient } from "@/lib/supabase/server";
 import { dealStages, type DealStage } from "@/lib/deals";
 import type { DealFilters } from "./filter-controls";
@@ -22,16 +23,23 @@ export default async function DealsPage({
   const user = await requireUser();
   const role = await effectiveRole(user);
   const supabase = await createClient();
-  const [dealsResult, configResult] = await Promise.all([
+  const [dealsResult, configResult, demographicsResult] = await Promise.all([
     supabase.from("deals").select("*").order("updated_at", { ascending: false }),
     supabase
       .from("vertical_config")
       .select("*")
       .order("sort_order", { ascending: true }),
+    supabase.from("tract_demographics").select("*"),
   ]);
 
   if (dealsResult.error) throw new Error(dealsResult.error.message);
   if (configResult.error) throw new Error(configResult.error.message);
+  if (demographicsResult.error) throw new Error(demographicsResult.error.message);
+
+  const tractDemographics: Record<string, TractDemographicsRow> = {};
+  for (const row of demographicsResult.data ?? []) {
+    tractDemographics[row.geoid] = row;
+  }
 
   const { error: activityError } = await supabase.from("activity_log").insert({
     user_id: user.id,
@@ -58,6 +66,9 @@ export default async function DealsPage({
       initialConfigs={configResult.data}
       initialDeals={dealsResult.data}
       initialDealId={typeof params.deal === "string" ? params.deal : undefined}
+      initialTractDemographics={tractDemographics}
+      initialView={params.view === "map" ? "map" : "grid"}
+      mapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ?? ""}
       effectiveRole={role}
       user={user}
     />

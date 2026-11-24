@@ -181,12 +181,19 @@ export type Database = {
           bldg_sf: number | null
           broker: string | null
           broker_phone: string | null
+          census_tract_geoid: string | null
           city: string | null
           client: string | null
           created_at: string
           field_provenance: Json
+          geocode_source: string | null
+          geocode_status: "ok" | "no_address" | "not_found" | "error" | null
+          geocoded_address: string | null
+          geocoded_at: string | null
           id: string
+          lat: number | null
           list_price: number | null
+          lng: number | null
           lot_sf: number | null
           market: string | null
           needs_review: boolean
@@ -216,12 +223,19 @@ export type Database = {
           bldg_sf?: number | null
           broker?: string | null
           broker_phone?: string | null
+          census_tract_geoid?: string | null
           city?: string | null
           client?: string | null
           created_at?: string
           field_provenance?: Json
+          geocode_source?: string | null
+          geocode_status?: "ok" | "no_address" | "not_found" | "error" | null
+          geocoded_address?: string | null
+          geocoded_at?: string | null
           id: string
+          lat?: number | null
           list_price?: number | null
+          lng?: number | null
           lot_sf?: number | null
           market?: string | null
           needs_review?: boolean
@@ -251,12 +265,19 @@ export type Database = {
           bldg_sf?: number | null
           broker?: string | null
           broker_phone?: string | null
+          census_tract_geoid?: string | null
           city?: string | null
           client?: string | null
           created_at?: string
           field_provenance?: Json
+          geocode_source?: string | null
+          geocode_status?: "ok" | "no_address" | "not_found" | "error" | null
+          geocoded_address?: string | null
+          geocoded_at?: string | null
           id?: string
+          lat?: number | null
           list_price?: number | null
+          lng?: number | null
           lot_sf?: number | null
           market?: string | null
           needs_review?: boolean
@@ -396,6 +417,39 @@ export type Database = {
           must_change_password?: boolean
           role?: Database["public"]["Enums"]["user_role"]
           verticals?: string[]
+        }
+        Relationships: []
+      }
+      tract_demographics: {
+        Row: {
+          fetched_at: string
+          geoid: string
+          households: number | null
+          median_age: number | null
+          median_household_income: number | null
+          pct_bachelors: number | null
+          population: number | null
+          source: string
+        }
+        Insert: {
+          fetched_at?: string
+          geoid: string
+          households?: number | null
+          median_age?: number | null
+          median_household_income?: number | null
+          pct_bachelors?: number | null
+          population?: number | null
+          source: string
+        }
+        Update: {
+          fetched_at?: string
+          geoid?: string
+          households?: number | null
+          median_age?: number | null
+          median_household_income?: number | null
+          pct_bachelors?: number | null
+          population?: number | null
+          source?: string
         }
         Relationships: []
       }

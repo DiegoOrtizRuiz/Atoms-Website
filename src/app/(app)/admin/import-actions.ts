@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import type { Database, Json } from "@/lib/database.types";
+import { geocodeMissingDeals } from "@/lib/geo/service";
 import {
   computeImportDiff,
   type ImportDiffPayload,
@@ -377,6 +378,12 @@ export async function applyImportRun(input: z.input<typeof applySchema>) {
 
   if (error) {
     throw new Error(`Import could not be applied: ${error.message}`);
+  }
+
+  try {
+    await geocodeMissingDeals();
+  } catch (geoError) {
+    console.error("Post-import geocoding failed (import already applied).", geoError);
   }
 
   for (const path of ["/admin", "/deals", "/weekly", "/rollup"]) {

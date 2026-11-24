@@ -37,6 +37,13 @@ function makeDeal(overrides: Partial<Deal>): Deal {
     version: 2,
     vertical: "Industrial",
     weekly_note: null,
+    lat: null,
+    lng: null,
+    geocode_status: null,
+    geocode_source: null,
+    geocoded_at: null,
+    census_tract_geoid: null,
+    geocoded_address: null,
     ...overrides,
   };
 }

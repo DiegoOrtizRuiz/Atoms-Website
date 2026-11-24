@@ -71,6 +71,18 @@ begin
     raise exception 'Analyst updated review_reasons';
   exception when insufficient_privilege then null;
   end;
+  begin
+    update public.deals set lat = 33.7, lng = -84.3, geocode_status = 'ok'
+    where id = current_setting('test.client_a_id');
+    raise exception 'Analyst updated geocode columns';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    insert into public.tract_demographics (geoid, source)
+    values ('00000000000', 'RLS test');
+    raise exception 'Analyst inserted into tract_demographics';
+  exception when insufficient_privilege then null;
+  end;
 end;
 $$;
 
