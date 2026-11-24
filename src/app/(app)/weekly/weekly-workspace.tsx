@@ -412,7 +412,9 @@ export function WeeklyWorkspace({
             </h1>
             <p className="mt-1.5 text-sm text-slate-500">
               Week of {format(parseISO(model.weekStart), "MMMM d, yyyy")} · as of{" "}
-              {format(asOf, "HH:mm")}
+              <span data-as-of={asOf.toISOString()} data-testid="weekly-as-of">
+                {format(asOf, "HH:mm:ss")}
+              </span>
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
