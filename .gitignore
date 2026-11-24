@@ -12,6 +12,9 @@
 
 # testing
 /coverage
+/e2e/report/
+/e2e/test-results/
+/e2e/.state/
 /data/
 !/data/src.xlsx
 /out/

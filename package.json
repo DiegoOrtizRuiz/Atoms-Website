@@ -12,7 +12,9 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "seed": "node scripts/run-seed.mjs"
+    "seed": "node scripts/run-seed.mjs",
+    "e2e": "playwright test -c e2e/playwright.config.ts",
+    "e2e:prod": "E2E_BASE_URL=https://atoms-website-three.vercel.app E2E_ALLOW_RESET=1 playwright test -c e2e/playwright.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -39,12 +41,16 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "autocannon": "^9.0.0",
+    "csv-parse": "^7.0.3",
     "eslint": "^9",
     "eslint-config-next": "^15.5.29",
+    "jszip": "^3.10.2",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^5.1.1"

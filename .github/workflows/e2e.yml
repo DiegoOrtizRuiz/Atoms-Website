@@ -1,0 +1,45 @@
+name: E2E Production Acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Target base URL for Playwright E2E suite
+        required: false
+        default: https://atoms-website-three.vercel.app
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E acceptance suite
+        run: npm run e2e:prod
+        env:
+          E2E_BASE_URL: ${{ inputs.base_url || 'https://atoms-website-three.vercel.app' }}
+          E2E_ALLOW_RESET: "1"
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Upload Playwright HTML & JSON report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: |
+            e2e/report/
+            e2e/.state/hash-check.json
+          retention-days: 30
