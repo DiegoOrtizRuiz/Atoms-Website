@@ -27,6 +27,13 @@ export type AcsFetchOptions = {
   timeoutMs?: number;
 };
 
+export class AcsFetchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AcsFetchError";
+  }
+}
+
 export function parseTractGeoid(
   geoid: string | null | undefined,
 ): { state: string; county: string; tract: string } | null {
@@ -84,13 +91,14 @@ export function computePctBachelorsPlus(values: {
 export async function fetchTractDemographics(
   geoid: string,
   options: AcsFetchOptions = {},
-): Promise<TractDemographicsInsert | null> {
+): Promise<TractDemographicsInsert> {
   const parts = parseTractGeoid(geoid);
-  if (!parts) return null;
+  if (!parts) throw new AcsFetchError("Invalid Census tract identifier.");
 
   const year = (options.year ?? process.env.CENSUS_ACS_YEAR ?? DEFAULT_ACS_YEAR).trim();
   const apiKey =
     options.apiKey !== undefined ? options.apiKey : (process.env.CENSUS_API_KEY ?? "");
+  if (!apiKey.trim()) throw new AcsFetchError("CENSUS_API_KEY is not configured.");
   const fetchImpl = options.fetchImpl ?? fetch;
   const timeoutMs = options.timeoutMs ?? 12_000;
 
@@ -99,9 +107,7 @@ export async function fetchTractDemographics(
     for: `tract:${parts.tract}`,
     in: `state:${parts.state} county:${parts.county}`,
   });
-  if (apiKey.trim()) {
-    params.set("key", apiKey.trim());
-  }
+  params.set("key", apiKey.trim());
 
   const url = `https://api.census.gov/data/${encodeURIComponent(year)}/acs/acs5?${params.toString()}`;
 
@@ -113,13 +119,29 @@ export async function fetchTractDemographics(
       headers: { Accept: "application/json" },
       cache: "no-store",
     });
-    if (!response.ok) return null;
+    if (!response.ok) throw new AcsFetchError(`Census ACS request failed (HTTP ${response.status}).`);
+    if (response.redirected && new URL(response.url).pathname.endsWith("/missing_key.html")) {
+      throw new AcsFetchError("Census ACS rejected the API key.");
+    }
 
-    const payload = (await response.json()) as unknown;
-    if (!Array.isArray(payload) || payload.length < 2) return null;
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch (error) {
+      if (controller.signal.aborted) throw error;
+      throw new AcsFetchError("Census ACS returned an invalid response.");
+    }
+    if (!Array.isArray(payload) || payload.length < 2) {
+      throw new AcsFetchError("Census ACS returned no tract data.");
+    }
     const headers = payload[0];
     const row = payload[1];
-    if (!Array.isArray(headers) || !Array.isArray(row)) return null;
+    if (!Array.isArray(headers) || !Array.isArray(row)) {
+      throw new AcsFetchError("Census ACS returned an invalid response.");
+    }
+    if (ACS_VARIABLES.some((variable) => !headers.includes(variable)) || row.length < headers.length) {
+      throw new AcsFetchError("Census ACS returned an incomplete response.");
+    }
 
     const byKey = new Map<string, unknown>();
     headers.forEach((header, index) => {
@@ -150,9 +172,15 @@ export async function fetchTractDemographics(
       households: householdsRaw !== null ? Math.round(householdsRaw) : null,
       pct_bachelors: pctBachelors,
       source: `Census ACS 5-yr (${year})`,
+      last_error: null,
     };
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof AcsFetchError) throw error;
+    throw new AcsFetchError(
+      controller.signal.aborted || (error instanceof Error && error.name === "AbortError")
+        ? "Census ACS request timed out."
+        : "Unable to reach Census ACS.",
+    );
   } finally {
     clearTimeout(timer);
   }

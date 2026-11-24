@@ -142,6 +142,15 @@ export function nextKeyDateForDeal(
   };
 }
 
+export function demographicsUnavailableReason(
+  geoid: string | null,
+  row: TractDemographicsRow | null | undefined,
+) {
+  if (row?.last_error) return row.last_error;
+  if (!row) return geoid ? "Not yet loaded." : "No Census tract is available.";
+  return null;
+}
+
 export function formatTractDemographics(row: TractDemographicsRow | null | undefined) {
   if (!row) return null;
   return {

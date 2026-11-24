@@ -65,7 +65,7 @@ describe("Census ACS helpers", () => {
 });
 
 describe("fetchTractDemographics", () => {
-  it("parses ACS 5-year tract variables and includes optional key only when configured", async () => {
+  it("parses ACS 5-year tract variables and sends the configured key", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse([
         [
@@ -101,7 +101,7 @@ describe("fetchTractDemographics", () => {
 
     const row = await fetchTractDemographics("13121001801", {
       year: "2023",
-      apiKey: "",
+      apiKey: "test-key",
       fetchImpl: fetchMock as unknown as typeof fetch,
     });
 
@@ -109,7 +109,7 @@ describe("fetchTractDemographics", () => {
     expect(url).toContain("https://api.census.gov/data/2023/acs/acs5?");
     expect(url).toContain("for=tract%3A001801");
     expect(url).toContain("in=state%3A13+county%3A121");
-    expect(url).not.toContain("key=");
+    expect(url).toContain("key=test-key");
 
     expect(row).toMatchObject({
       geoid: "13121001801",
@@ -121,14 +121,6 @@ describe("fetchTractDemographics", () => {
       source: "Census ACS 5-yr (2023)",
     });
 
-    // With API key configured
-    await fetchTractDemographics("13121001801", {
-      year: "2022",
-      apiKey: "secret-key",
-      fetchImpl: fetchMock as unknown as typeof fetch,
-    });
-    expect(String(fetchMock.mock.calls[1][0])).toContain("key=secret-key");
-    expect(String(fetchMock.mock.calls[1][0])).toContain("/data/2022/acs/acs5");
   });
 
   it("converts negative sentinels in ACS response to null", async () => {
@@ -161,7 +153,7 @@ describe("fetchTractDemographics", () => {
 
     const row = await fetchTractDemographics("12086000705", {
       fetchImpl: fetchMock as unknown as typeof fetch,
-      apiKey: "",
+      apiKey: "test-key",
     });
 
     expect(row).toMatchObject({
@@ -174,12 +166,28 @@ describe("fetchTractDemographics", () => {
     });
   });
 
-  it("returns null gracefully when Census ACS API fails", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response("error", { status: 503 }));
-    const row = await fetchTractDemographics("13121001801", {
+  it("reports a missing key without making a request", async () => {
+    const fetchMock = vi.fn();
+    await expect(fetchTractDemographics("13121001801", {
       fetchImpl: fetchMock as unknown as typeof fetch,
-      apiKey: "",
-    });
-    expect(row).toBeNull();
+      apiKey: " ",
+    })).rejects.toThrow("CENSUS_API_KEY is not configured.");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reports an API error without exposing the key", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("error", { status: 503 }));
+    await expect(fetchTractDemographics("13121001801", {
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      apiKey: "test-key",
+    })).rejects.toThrow("Census ACS request failed (HTTP 503).");
+  });
+
+  it("reports an invalid response", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([["unexpected"], ["value"]]));
+    await expect(fetchTractDemographics("13121001801", {
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      apiKey: "test-key",
+    })).rejects.toThrow("Census ACS returned an incomplete response.");
   });
 });

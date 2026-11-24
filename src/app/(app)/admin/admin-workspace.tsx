@@ -12,7 +12,7 @@ import { hasPendingAiSuggestions, pendingAiSections } from "@/lib/ai-suggestions
 import type { Database, Json } from "@/lib/database.types";
 import { fmtDate, fmtNumber, fmtOrDash } from "@/lib/format";
 import { usePresenceMembers } from "@/lib/presence";
-import { geocodeMissingAdminDeals } from "./actions";
+import { geocodeMissingAdminDeals, retryFailedDemographics } from "./actions";
 import { ActivityPanel } from "./activity-panel";
 import type { ImportRunRecord } from "./import-actions";
 import { ImportPanel, type ImportRunListItem } from "./import-panel";
@@ -139,13 +139,16 @@ function Overview({
 
 function DataHealth({
   deals,
+  failedTracts,
   lastImportAt,
 }: {
   deals: HealthDeal[];
+  failedTracts: number;
   lastImportAt: string | null;
 }) {
   const router = useRouter();
   const [geocoding, setGeocoding] = useState(false);
+  const [retryingDemographics, setRetryingDemographics] = useState(false);
 
   const stages = new Map<string, number>();
   const rawStages = new Map<string, number>();
@@ -174,16 +177,31 @@ function DataHealth({
     try {
       const summary = await geocodeMissingAdminDeals();
       const demoPart = summary.demographics
-        ? ` Tracts: ${summary.demographics.refreshed} fetched, ${summary.demographics.cached} cached.`
+        ? ` Tracts: ${summary.demographics.refreshed} fetched, ${summary.demographics.cached} cached, ${summary.demographics.failed} failed.`
         : "";
-      toast.success(
-        `Geocoded ${summary.processed} deal(s): ${summary.ok} ok, ${summary.no_address} no address, ${summary.not_found} not found, ${summary.error} error.${demoPart}`,
-      );
+      const message = `Geocoded ${summary.processed} deal(s): ${summary.ok} ok, ${summary.no_address} no address, ${summary.not_found} not found, ${summary.error} error.${demoPart}`;
+      if (summary.demographics?.failed) toast.error(message);
+      else toast.success(message);
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to geocode deals.");
     } finally {
       setGeocoding(false);
+    }
+  }
+
+  async function retryDemographics() {
+    setRetryingDemographics(true);
+    try {
+      const summary = await retryFailedDemographics();
+      const message = `Demographics: ${summary.refreshed} updated, ${summary.failed} failed.`;
+      if (summary.failed) toast.error(message);
+      else toast.success(message);
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to retry demographics.");
+    } finally {
+      setRetryingDemographics(false);
     }
   }
 
@@ -276,6 +294,17 @@ function DataHealth({
         <Card className="xl:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between gap-3">
             <div>
+              <CardTitle>Failed demographics tracts: {fmtNumber(failedTracts)}</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">Retry Census demographics requests after resolving the reported issue.</p>
+            </div>
+            <Button disabled={retryingDemographics || failedTracts === 0} onClick={() => void retryDemographics()} size="sm">
+              {retryingDemographics ? "Retrying…" : "Retry"}
+            </Button>
+          </CardHeader>
+        </Card>
+        <Card className="xl:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
+            <div>
               <CardTitle>Geocoding &amp; tract coverage</CardTitle>
               <p className="mt-1 text-xs text-muted-foreground">
                 US Census Geocoder (no key required) with optional Google fallback. Deals without an address stay off the map.
@@ -314,6 +343,7 @@ export function AdminWorkspace({
   autoRefreshRunId,
   clients,
   deals,
+  failedTracts,
   importRuns,
   initialActiveRun,
   initialTab,
@@ -332,6 +362,7 @@ export function AdminWorkspace({
   autoRefreshRunId?: number;
   clients: string[];
   deals: HealthDeal[];
+  failedTracts: number;
   importRuns: ImportRunListItem[];
   initialActiveRun: ImportRunRecord | null;
   initialTab?: string;
@@ -387,7 +418,7 @@ export function AdminWorkspace({
           <ActivityPanel profiles={profiles} />
         </TabsContent>
         <TabsContent value="health" className="mt-5">
-          <DataHealth deals={deals} lastImportAt={lastImportAt} />
+          <DataHealth deals={deals} failedTracts={failedTracts} lastImportAt={lastImportAt} />
         </TabsContent>
         <TabsContent value="verticals" className="mt-5">
           <VerticalConfigPanel

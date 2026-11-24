@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   requireUser: vi.fn(),
   createClient: vi.fn(),
   createAdminClient: vi.fn(),
+  ensureTractDemographics: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -18,6 +19,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/geo/service", () => ({
+  ensureTractDemographics: mocks.ensureTractDemographics,
   geocodeMissingDeals: vi.fn().mockResolvedValue({
     processed: 0,
     ok: 0,
@@ -32,6 +34,7 @@ vi.mock("@/lib/geo/service", () => ({
 import {
   addVerticalConfig,
   geocodeMissingAdminDeals,
+  retryFailedDemographics,
   inviteAdminUser,
   registerSourceTab,
   reorderVerticalConfigs,
@@ -42,6 +45,26 @@ import {
 
 beforeEach(() => {
   vi.resetAllMocks();
+});
+
+it("retries only failed demographics tracts for an administrator", async () => {
+  mocks.requireUser.mockResolvedValue({ id: "admin-id", role: "admin" });
+  const not = vi.fn().mockResolvedValue({
+    data: [{ geoid: "13121001702" }, { geoid: "13121001801" }],
+    error: null,
+  });
+  mocks.createAdminClient.mockReturnValue({
+    from: () => ({ select: () => ({ not }) }),
+  });
+  const summary = { checked: 2, refreshed: 2, cached: 0, failed: 0 };
+  mocks.ensureTractDemographics.mockResolvedValue(summary);
+
+  await expect(retryFailedDemographics()).resolves.toEqual(summary);
+  expect(not).toHaveBeenCalledWith("last_error", "is", null);
+  expect(mocks.ensureTractDemographics).toHaveBeenCalledWith(
+    ["13121001702", "13121001801"],
+    { force: true },
+  );
 });
 
 it.each(["temporary", "email"] as const)("creates a user in %s mode without falling back", async (mode) => {
@@ -144,6 +167,9 @@ it("rejects direct admin mutations from a viewer", async () => {
     }),
   ).rejects.toThrow("Only administrators can perform this action.");
   await expect(geocodeMissingAdminDeals()).rejects.toThrow(
+    "Only administrators can perform this action.",
+  );
+  await expect(retryFailedDemographics()).rejects.toThrow(
     "Only administrators can perform this action.",
   );
   expect(mocks.createClient).not.toHaveBeenCalled();

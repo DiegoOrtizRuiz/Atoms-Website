@@ -27,19 +27,6 @@ test("capture the guide using leadership and admin demo accounts", async ({ logi
   await leadership.locator("header").first().screenshot({ path: path.join(output, "weekly.png") });
   await expect(leadership.getByRole("link", { name: "Help for weekly" })).toHaveAttribute("href", "/help#weekly");
 
-  await leadership.goto("/deals?view=map");
-  await expect(leadership.getByRole("link", { name: "Help for map" })).toHaveAttribute("href", "/help#map");
-  const card = leadership.getByTestId("deal-hover-card");
-  const marker = leadership.locator('[title="635 Angier Ave"]').first();
-  await expect(card.or(marker)).toBeVisible();
-  if (!(await card.isVisible())) {
-    await marker.hover();
-  } else {
-    await leadership.getByRole("button", { name: /635 Angier Ave/ }).hover();
-  }
-  await expect(card).toBeVisible();
-  await card.screenshot({ path: path.join(output, "map-card.png") });
-
   const admin = await loginAs("admin");
   await admin.goto("/help");
   await expect(admin.locator("#admin")).toBeVisible();
@@ -59,4 +46,22 @@ test("capture the guide using leadership and admin demo accounts", async ({ logi
     path: path.join(output, "assumption.png"),
     clip: { x, y, width: Math.min(700, 1440 - x), height: Math.min(280, 900 - y) },
   });
+});
+
+test("capture the map card with loaded demographics", async ({ loginAs }) => {
+  mkdirSync(output, { recursive: true });
+  const leadership = await loginAs("leadership");
+  await leadership.goto("/deals?view=map");
+  await expect(leadership.getByRole("link", { name: "Help for map" })).toHaveAttribute("href", "/help#map");
+  const card = leadership.getByTestId("deal-hover-card");
+  const marker = leadership.locator('[title="635 Angier Ave"]').first();
+  await expect(card.or(marker)).toBeVisible();
+  if (!(await card.isVisible())) {
+    await marker.hover();
+  } else {
+    await leadership.getByRole("button", { name: /635 Angier Ave/ }).hover();
+  }
+  await expect(card).toBeVisible();
+  await expect(card.locator("dt").filter({ hasText: "Population" }).locator("..").locator("dd")).toContainText(/\d/);
+  await card.screenshot({ path: path.join(output, "map-card.png") });
 });

@@ -44,6 +44,7 @@ export default async function AdminPage({
     sourceTabs,
     clients,
     deals,
+    demographicsFailures,
     attributeDeals,
     loginCounts,
     imports,
@@ -58,6 +59,7 @@ export default async function AdminPage({
     supabase
       .from("deals")
       .select("id, stage, needs_review, review_reasons, stage_raw, field_provenance, address, weekly_note, notes_extracted, geocode_status, lat, lng, census_tract_geoid"),
+    supabase.from("tract_demographics").select("geoid", { count: "exact", head: true }).not("last_error", "is", null),
     supabase.from("deals").select("vertical, attributes"),
     supabase.rpc("admin_logins_per_day", { days: 30 }),
     supabase
@@ -85,6 +87,7 @@ export default async function AdminPage({
     sourceTabs,
     clients,
     deals,
+    demographicsFailures,
     attributeDeals,
     loginCounts,
     importRunsRes,
@@ -93,6 +96,7 @@ export default async function AdminPage({
   }
   if (imports.error) throw new Error(imports.error.message);
   if (activeRunRes.error) throw new Error(activeRunRes.error.message);
+  if (demographicsFailures.count === null) throw new Error("Unable to count failed demographics tracts.");
 
   const importRuns: ImportRunListItem[] = (importRunsRes.data ?? []).map((row) => ({
     id: row.id,
@@ -191,6 +195,7 @@ export default async function AdminPage({
           ),
         ].sort()}
         deals={deals.data ?? []}
+        failedTracts={demographicsFailures.count}
         importRuns={importRuns}
         initialActiveRun={initialActiveRun}
         initialTab={params.tab}

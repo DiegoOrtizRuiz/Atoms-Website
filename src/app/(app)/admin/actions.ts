@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser, userRoles } from "@/lib/auth";
 import { authCallbackUrl } from "@/lib/auth-redirect";
-import { geocodeMissingDeals } from "@/lib/geo/service";
+import { ensureTractDemographics, geocodeMissingDeals } from "@/lib/geo/service";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -392,6 +392,19 @@ export async function getAdminActivity(input: z.input<typeof activityFilterSchem
 export async function geocodeMissingAdminDeals() {
   await requireAdmin();
   const summary = await geocodeMissingDeals({ retryErrors: true });
+  revalidatePath("/admin");
+  revalidatePath("/deals");
+  return summary;
+}
+
+export async function retryFailedDemographics() {
+  await requireAdmin();
+  const admin = createAdminClient();
+  const { data, error } = await admin.from("tract_demographics")
+    .select("geoid")
+    .not("last_error", "is", null);
+  if (error) throw new Error(`Unable to load failed tracts: ${error.message}`);
+  const summary = await ensureTractDemographics((data ?? []).map((row) => row.geoid), { force: true });
   revalidatePath("/admin");
   revalidatePath("/deals");
   return summary;

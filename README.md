@@ -166,7 +166,7 @@ npm run build
 python -m pytest -q scripts
 ```
 
-Latest verified counts: **85 Vitest tests** across 22 files, **47 Python
+Latest verified counts: **93 Vitest tests** across 23 files, **47 Python
 tests**, and **16 production Playwright E2E tests**. The regular CI workflow
 runs the Python tests, Vitest, lint, typecheck, and build; E2E is run
 separately because it mutates shared test data and needs production credentials.
@@ -255,8 +255,10 @@ production deployment so the keepalive workflow can reach `/api/health`.
 
 - Property geocoding uses the US Census Geocoder (`geographies/onelineaddress`)
   and tract demographics use the US Census ACS 5-year API (`CENSUS_ACS_YEAR`,
-  default `2023`, optional `CENSUS_API_KEY`), both server-side and cached in
-  Supabase. No API key is required for geocoding or demographics.
+  default `2023`, required `CENSUS_API_KEY`), both server-side and cached in
+  Supabase. The Census Geocoder does not require a key. Configure the Census
+  key locally and in Vercel; Admin → Data health shows failed tracts and lets
+  administrators retry after the issue is resolved.
 - Optionally set `GOOGLE_GEOCODING_KEY` (server-only) as a fallback for
   addresses missed by the Census Geocoder.
 - To render the interactive Google Map on `/deals?view=map`, set

@@ -425,6 +425,7 @@ export type Database = {
           fetched_at: string
           geoid: string
           households: number | null
+          last_error: string | null
           median_age: number | null
           median_household_income: number | null
           pct_bachelors: number | null
@@ -435,6 +436,7 @@ export type Database = {
           fetched_at?: string
           geoid: string
           households?: number | null
+          last_error?: string | null
           median_age?: number | null
           median_household_income?: number | null
           pct_bachelors?: number | null
@@ -445,6 +447,7 @@ export type Database = {
           fetched_at?: string
           geoid?: string
           households?: number | null
+          last_error?: string | null
           median_age?: number | null
           median_household_income?: number | null
           pct_bachelors?: number | null

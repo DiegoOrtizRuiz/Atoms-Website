@@ -3,6 +3,7 @@ import { dealStages, type Deal, type VerticalConfig } from "@/lib/deals";
 import { STAGE_STYLES } from "@/lib/stage-colors";
 import type { TractDemographicsRow } from "./acs";
 import {
+  demographicsUnavailableReason,
   formatTractDemographics,
   nextKeyDateForDeal,
   partitionDealsForMap,
@@ -72,6 +73,7 @@ const avConfig: VerticalConfig = {
 const atlTract: TractDemographicsRow = {
   geoid: "13121001801",
   fetched_at: "2026-11-24T00:00:00Z",
+  last_error: null,
   population: 4812,
   median_household_income: 92450,
   median_age: 33.7,
@@ -140,6 +142,14 @@ describe("map-helpers and DealsMap fallback", () => {
     });
     expect(missingDemo?.medianIncome).toBe("—");
     expect(missingDemo?.pctBachelors).toBe("—");
+  });
+
+  it("reports a recorded demographics failure instead of treating cached data as available", () => {
+    expect(demographicsUnavailableReason(atlTract.geoid, { ...atlTract, last_error: "Census ACS request failed (HTTP 503)." }))
+      .toBe("Census ACS request failed (HTTP 503).");
+    expect(demographicsUnavailableReason(atlTract.geoid, null)).toBe("Not yet loaded.");
+    expect(demographicsUnavailableReason(null, null)).toBe("No Census tract is available.");
+    expect(demographicsUnavailableReason(atlTract.geoid, atlTract)).toBeNull();
   });
 
   it("extracts next key date from notes", () => {

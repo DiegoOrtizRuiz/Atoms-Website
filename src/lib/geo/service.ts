@@ -3,6 +3,7 @@ import "server-only";
 import type { Deal } from "@/lib/deals";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  AcsFetchError,
   fetchTractDemographics,
   isDemographicsStale,
   parseTractGeoid,
@@ -55,23 +56,34 @@ export async function ensureTractDemographics(
   const admin = createAdminClient();
   const { data: existingRows, error } = await admin
     .from("tract_demographics")
-    .select("geoid, fetched_at")
+    .select("geoid, fetched_at, last_error")
     .in("geoid", uniqueGeoids);
   if (error) throw new Error(error.message);
 
   const existingByGeoid = new Map(
-    (existingRows ?? []).map((row) => [row.geoid, row.fetched_at]),
+    (existingRows ?? []).map((row) => [row.geoid, row]),
   );
 
   for (const geoid of uniqueGeoids) {
-    const existingFetchedAt = existingByGeoid.get(geoid);
-    if (!options.force && existingFetchedAt && !isDemographicsStale(existingFetchedAt)) {
+    const existing = existingByGeoid.get(geoid);
+    if (!options.force && existing && !existing.last_error && !isDemographicsStale(existing.fetched_at)) {
       summary.cached += 1;
       continue;
     }
 
-    const fetched = await fetchTractDemographics(geoid);
-    if (!fetched) {
+    let fetched;
+    try {
+      fetched = await fetchTractDemographics(geoid);
+    } catch (error) {
+      if (!(error instanceof AcsFetchError)) throw error;
+      const { error: saveError } = existing
+        ? await admin.from("tract_demographics").update({ last_error: error.message }).eq("geoid", geoid)
+        : await admin.from("tract_demographics").insert({
+            geoid,
+            source: "Census ACS 5-yr",
+            last_error: error.message,
+          });
+      if (saveError) throw new Error(`Unable to record demographics failure for tract ${geoid}: ${saveError.message}`);
       summary.failed += 1;
       continue;
     }
@@ -80,8 +92,7 @@ export async function ensureTractDemographics(
       .from("tract_demographics")
       .upsert(fetched, { onConflict: "geoid" });
     if (upsertError) {
-      summary.failed += 1;
-      continue;
+      throw new Error(`Unable to save demographics for tract ${geoid}: ${upsertError.message}`);
     }
     summary.refreshed += 1;
   }
@@ -312,11 +323,7 @@ export async function geocodeMissingDeals(options: {
 
   summary.tractGeoids = [...geoidSet];
   if (summary.tractGeoids.length > 0) {
-    try {
-      summary.demographics = await ensureTractDemographics(summary.tractGeoids);
-    } catch (demoError) {
-      console.error("Unable to refresh tract demographics batch.", demoError);
-    }
+    summary.demographics = await ensureTractDemographics(summary.tractGeoids);
   }
   return summary;
 }

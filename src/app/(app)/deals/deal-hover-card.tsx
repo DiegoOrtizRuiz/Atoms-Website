@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { TractDemographicsRow } from "@/lib/geo/acs";
 import {
+  demographicsUnavailableReason,
   formatTractDemographics,
   nextKeyDateForDeal,
   verticalAttributesForDeal,
@@ -65,6 +66,7 @@ export function DealHoverCard({
   const attrs = verticalAttributesForDeal(deal, config);
   const keyDate = nextKeyDateForDeal(deal);
   const demo = formatTractDemographics(demographics);
+  const unavailableReason = demographicsUnavailableReason(deal.census_tract_geoid, demographics);
 
   return (
     <div className="w-[310px] space-y-3 text-left text-xs text-slate-800" data-testid="deal-hover-card">
@@ -177,7 +179,11 @@ export function DealHoverCard({
             </span>
           ) : null}
         </div>
-        {demo ? (
+        {unavailableReason ? (
+          <p className="text-[11px] text-amber-700">
+            Demographics unavailable: {unavailableReason}
+          </p>
+        ) : demo ? (
           <>
             <dl className="grid grid-cols-2 gap-x-3 gap-y-1">
               <div>
@@ -205,13 +211,7 @@ export function DealHoverCard({
               {demo.sourceLabel}
             </p>
           </>
-        ) : (
-          <p className="text-[11px] text-slate-400">
-            {deal.census_tract_geoid
-              ? `Census ACS 5-yr, tract ${deal.census_tract_geoid} (pending)`
-              : "No tract demographics cached yet."}
-          </p>
-        )}
+        ) : null}
       </div>
 
       <Button
