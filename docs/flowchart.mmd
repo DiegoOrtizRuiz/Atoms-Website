@@ -1,16 +1,55 @@
-flowchart TD
-  A[Messy Google Sheet<br/>tabs per client, different columns,<br/>colored text = assumption] --> B[Audit<br/>13 status spellings, no config tab,<br/>$/SF mismatch, blank vs 0, Metro vs city]
-  B --> C[normalize.py<br/>map by header name, keep raw values,<br/>recompute derived, flag never drop]
-  C --> T{25 tests in CI<br/>rows in = rows out?}
-  T -- fail --> C
-  T -- pass --> D[LLM enrichment<br/>notes -> dates, risks, price context,<br/>weekly note — suggestions only]
-  D --> E[(Supabase cloud Postgres<br/>ONE deals table<br/>history · provenance · RLS · Realtime)]
-  subgraph Vercel[Cloud-hosted Next.js app on Vercel]
-    F[Operations grid<br/>filter · edit · mark/confirm assumptions]
-    G[Weekly Review<br/>by vertical · needs attention ·<br/>present mode · PPTX export]
-    H[User logs & Permissions<br/>roles · online now · usage by person · audit]
+flowchart LR
+  Workbook[Source workbook<br/>client tabs, mixed headers and notes]
+
+  subgraph Import[Import and configuration]
+    Py[Python normalizer<br/>offline reference]
+    TS[In-app TypeScript importer<br/>dry run, diff, human approval]
+    Config[(vertical_config<br/>source_tabs)]
+    Parity[Python ↔ TypeScript parity tests]
+    Workbook --> Py
+    Workbook --> TS
+    Config --> TS
+    Py --> Parity
+    TS --> Parity
   end
-  E <--> F
-  E <--> G
-  E <--> H
-  I[GitHub push] --> J[CI: pytest · lint · tsc · build] --> K[Vercel deploy<br/>preview per PR · prod on main]
+
+  subgraph Enrichment[Optional enrichment; suggestions only]
+    Notes[Deal notes]
+    Extract[Deterministic date extraction]
+    LLM[LLM suggestions<br/>evidence and confidence]
+    Review[Human review<br/>accept, edit, dismiss]
+    Notes --> Extract
+    Notes -. optional .-> LLM
+    Extract --> Review
+    LLM --> Review
+  end
+
+  subgraph Cloud[Supabase cloud · one source of truth]
+    DB[(Postgres<br/>deals · raw values · provenance<br/>history · roles/RLS · imports)]
+    Geo[Geocoding + Census ACS<br/>cached tract data]
+    DB <--> Geo
+  end
+
+  Parity -->|validated import| DB
+  Review -->|approved suggestion only| DB
+
+  subgraph Product[Vercel · Next.js application]
+    Ops[Operations<br/>grid · edits · map]
+    Weekly[Weekly Review<br/>live view · PPTX]
+    Admin[Admin<br/>users · audit · config · import]
+    Rollup[Rollup<br/>vertical × stage · outreach]
+  end
+  DB <--> Ops
+  DB <--> Weekly
+  DB <--> Admin
+  DB <--> Rollup
+  Geo --> Ops
+
+  subgraph Delivery[Quality and delivery]
+    CI[GitHub CI<br/>pytest · lint · typecheck · Vitest parity · build]
+    E2E[Playwright acceptance suite<br/>isolated sessions · restore/hash check]
+    Deploy[Vercel deployment<br/>main → production · PR → preview]
+  end
+  DB --> E2E
+  CI --> Deploy
+  E2E -. manual workflow .-> Deploy

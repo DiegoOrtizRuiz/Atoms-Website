@@ -1,0 +1,29 @@
+flowchart TD
+  Cell[Read the original cell<br/>keep its raw value]
+  Mapping{Known mapping?}
+  Normalize[Normalize to canonical value<br/>preserve raw alongside it]
+  Review[Mark Needs review<br/>retain raw value and reason]
+  Derived{Derived field?}
+  Recompute[Recompute from source inputs<br/>compare with supplied value]
+  Flag[Flag mismatch for review<br/>never trust typed derived value]
+  Color{Colored source text?}
+  Assumed[Mark provenance as assumed<br/>keep value visible for confirmation]
+  Source[Keep source provenance]
+  Notes{Free-text notes?}
+  Dates[Extract dates deterministically]
+  LLM[Optionally ask LLM for suggestions<br/>with evidence; never overwrite source]
+  Human[Human reviews, edits, accepts or dismisses]
+  Store[(Save in the single dataset<br/>with raw values and provenance)]
+
+  Cell --> Mapping
+  Mapping -- yes --> Normalize --> Derived
+  Mapping -- no --> Review --> Derived
+  Derived -- yes --> Recompute --> Color
+  Recompute -->|mismatch| Flag --> Color
+  Derived -- no --> Color
+  Color -- yes --> Assumed --> Notes
+  Color -- no --> Source --> Notes
+  Notes -- yes --> Dates --> Human
+  Notes -. optional .-> LLM --> Human
+  Human --> Store
+  Notes -- no --> Store

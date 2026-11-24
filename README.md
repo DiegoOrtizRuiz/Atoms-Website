@@ -100,26 +100,31 @@ provider or API key.
   Operations filtered to those deals. Select a deal in **Longest in current
   stage** to open its details. Contact outreach percentages summarize the
   contact records.
-- On **Admin**, use the tabs to review the overview, users, activity, and data
-  health. **Online now** shows signed-in users currently viewing the app.
-  Administrators can use role preview to inspect how the interface appears
-  for another role; preview does not grant that role's permissions to the
-  administrator.
+- On **Admin**, use **Verticals & tabs** to review the live configuration and
+  **Data import** to upload a workbook and inspect its dry-run diff. Do not
+  apply an import during a reviewer tour. The overview, users, activity, and
+  data-health tabs provide the administration and audit tools. **Online now**
+  shows signed-in users currently viewing the app. Role preview changes the
+  interface only; it does not grant another role's permissions.
 
-### A guided five-step tour
+### Try this in 2 minutes
 
 1. Sign in as `viewer@demo.test` and open **Operations**. Filter by a vertical
    or stage, then select a deal address to see its notes and history.
-2. Find an italicized value with a colored dot. Read its tooltip to see whether
-   it is an assumption or an LLM suggestion. A viewer can inspect it but
-   cannot change or confirm it.
+2. Select the **Map** toggle. The map uses the same filters; when the map is
+   available, select a marker for site details. If the Google Maps key is not
+   configured, the page still shows the geocoded summary and **Not on map**
+   list.
 3. Open **Weekly Review** and look for the Seattle closing date in **Needs
    attention this week**. Try **Present** and **Export PPTX**.
 4. Sign out and sign in as `leadership@demo.test`. Return to Weekly Review and
    try **Save snapshot**. Leadership can save a snapshot but cannot edit deal
    records.
-5. If you have the admin credentials, sign in as `admin@demo.test` and review
-   **Online now**, usage, and data health on the **Admin** page.
+5. If you have the admin credentials, sign in as `admin@demo.test`, open
+   **Admin → Data import**, upload the supplied workbook, and inspect the
+   dry-run reconciliation. Do not select **Apply** during a review: this
+   changes the shared live dataset. The other Admin tabs show users, activity,
+   usage, and data health.
 
 ### Helpful notes for reviewers
 
@@ -135,31 +140,20 @@ provider or API key.
   health response reports a problem or you remain unable to sign in, contact
   the person who shared the demo.
 
-For a quick tour of the architecture, see the diagram below. The importer
-report is a developer/CI check, not a page or action that reviewers need to
-find in the app.
+The importer report is a developer/CI check, not a page reviewers need to find
+in the app.
 
 ### Architecture
 
-```mermaid
-flowchart TD
-  A[Messy Google Sheet<br/>tabs per client, different columns,<br/>colored text = assumption] --> B[Audit<br/>13 status spellings, no config tab,<br/>$/SF mismatch, blank vs 0, Metro vs city]
-  B --> C[normalize.py<br/>map by header name, keep raw values,<br/>recompute derived, flag never drop]
-  C --> T{25 tests in CI<br/>rows in = rows out?}
-  T -- fail --> C
-  T -- pass --> E[(Supabase cloud Postgres<br/>ONE deals table<br/>history · provenance · RLS · Realtime)]
-  T -. optional .-> D[Local LLM enrichment<br/>notes -> dates, risks, price context,<br/>weekly note — suggestions only]
-  D --> E
-  subgraph Vercel[Cloud-hosted Next.js app on Vercel]
-    F[Operations grid<br/>filter · edit · mark/confirm assumptions]
-    G[Weekly Review<br/>by vertical · needs attention ·<br/>present mode · PPTX export]
-    H[User logs & Permissions<br/>roles · online now · usage by person · audit]
-  end
-  E <--> F
-  E <--> G
-  E <--> H
-  I[GitHub push] --> J[CI: pytest · lint · tsc · build] --> K[Vercel deploy<br/>preview per PR · prod on main]
-```
+![System architecture: importer, shared Supabase data, app views, CI, and acceptance tests](./docs/flowchart.png)
+
+Source: [Mermaid diagram](./docs/flowchart.mmd) · [PDF](./docs/flowchart.pdf)
+
+### How messy data is handled
+
+![Decision flow for mapping, review, derived values, assumptions, and note suggestions](./docs/thinking.png)
+
+Source: [Mermaid diagram](./docs/thinking.mmd)
 
 ### Test commands
 
@@ -170,6 +164,22 @@ npm test
 npm run build
 python -m pytest -q scripts
 ```
+
+Latest verified counts: **83 Vitest tests** across 21 files, **47 Python
+tests**, and **16 production Playwright E2E tests**. The regular CI workflow
+runs the Python tests, Vitest, lint, typecheck, and build; E2E is run
+separately because it mutates shared test data and needs production credentials.
+
+### Submission
+
+- **Live app:** [atoms-website-three.vercel.app](https://atoms-website-three.vercel.app)
+- **System flowchart:** [PNG](./docs/flowchart.png) · [PDF](./docs/flowchart.pdf) · [Mermaid source](./docs/flowchart.mmd)
+- **Data-handling thinking flow:** [PNG](./docs/thinking.png) · [Mermaid source](./docs/thinking.mmd)
+- **Process log:** [PROCESS_LOG.md](./PROCESS_LOG.md)
+- **AI conversation summary:** [docs/ai-conversation-summary.md](./docs/ai-conversation-summary.md)
+- **LLM evaluation:** [docs/llm-eval.md](./docs/llm-eval.md)
+- **Load test:** [docs/load-test.md](./docs/load-test.md)
+- **End-to-end report:** [e2e/report/index.html](./e2e/report/index.html) (16/16 passed)
 
 ## Developer notes
 

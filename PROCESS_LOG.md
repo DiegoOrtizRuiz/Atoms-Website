@@ -1,9 +1,38 @@
 # Process log
 
-Tool: VS Code + GitHub Copilot (Agent mode, Copilot SDK). Project instructions in `.github/copilot-instructions.md`; one reusable prompt per phase in `.github/prompts/`.
+## Summary
 
-## Approach (1 paragraph)
-_Audited the workbook first, wrote a deterministic normalizer with tests before any UI, then built the three views on one Supabase table. LLM used only for unstructured notes and unknown labels — always as labeled suggestions a human confirms._
+I began by auditing the workbook before building screens. I kept one Supabase database as the source of truth, built the Python normalizer and tests before the app views, then added the in-app importer with parity against that reference. The same deal records power Operations, Weekly Review, Admin, Rollup, and the Map view.
+
+I made the data decisions explicit: Metro is the client's search market while City/State locate the property; `Listed` is not a funnel stage and stays `Needs review`; blank means unknown, not zero; and $/SF is recomputed from inputs (the workbook's $217.79 for 37 S Hudson St did not match the $217.77 calculation). I preserved raw values, treated colored text as an assumption that a permitted user can later confirm, and rebuilt the missing vertical configuration as `vertical_config` plus a source-tab registry.
+
+I directed the work with shared project rules and phase prompts, and used tests and production checks to catch gaps rather than treating a plausible implementation as proof. I corrected setup guidance against the actual Supabase key UI, fixed Python resolution for the seed command, and kept LLM output as evidence-backed suggestions until a human reviews it. [[DIEGO: what surprised me most during the build]]
+
+With the 3–5 hour target in mind, I put the shared-data foundation and core Operations/Weekly/Admin workflows first, hardened permissions and auth next, then used later phases for import, map, LLM review, and repeatable acceptance. I kept the work deployed and testable as scope expanded; the items still open are listed under “What I'd do next.” [[DIEGO: what would I reorder or do differently]]
+
+## Time spent
+
+| Group | Phase | Work | Hours |
+|---|---:|---|---|
+| Core | 0 | Workbook audit and data decisions | [[DIEGO: hours]] |
+| Core | 1 | App scaffold and first deployment | [[DIEGO: hours]] |
+| Core | 2 | Schema and RLS | [[DIEGO: hours]] |
+| Core | 3 | Seed data and demo accounts | [[DIEGO: hours]] |
+| Core | 4 | Optional LLM enrichment foundation | [[DIEGO: hours]] |
+| Core | 5 | Operations | [[DIEGO: hours]] |
+| Core | 6 | Weekly Review and PPTX | [[DIEGO: hours]] |
+| Core | 7 | Admin and permissions | [[DIEGO: hours]] |
+| Stretch | 8 | Rollup and map plan | [[DIEGO: hours]] |
+| Stretch | 9 | In-app cloud import | [[DIEGO: hours]] |
+| Hardening | 10 | Code-review fixes | [[DIEGO: hours]] |
+| Hardening | 11 | Admin access and usage workflows | [[DIEGO: hours]] |
+| Hardening | 12 | Rollup and reviewer readiness | [[DIEGO: hours]] |
+| Hardening | 13 | Auth email and password flows | [[DIEGO: hours]] |
+| Extensions | 14 | Editable vertical config and tab registry | [[DIEGO: hours]] |
+| Extensions | 15 | In-app importer and dry-run diff | [[DIEGO: hours]] |
+| Extensions | 16 | Map, geocoding, and tract demographics | [[DIEGO: hours]] |
+| Extensions | 17 | LLM evaluation and human review | [[DIEGO: hours]] |
+| Extensions | 18 | E2E acceptance and load check | [[DIEGO: hours]] |
 
 ## Data assumptions
 - No config tab in the file → recreated vertical mapping from tab prefixes (food/av/catering) and target_weekly_view names.
@@ -19,16 +48,20 @@ _Audited the workbook first, wrote a deterministic normalizer with tests before 
 - Year-less note dates resolved to next occurrence after import date.
 - Weekly view row selection inferred from target_weekly_view: Pre LOI and later + one Sourcing per market; editable via `show_in_weekly`.
 - Days in stage backdated from Days On Market where present, else import time.
-- Temporary-password accounts are blocked by RLS until they set a new password; existing profiles default to not requiring a change.
+- Temporary-password accounts are blocked until they set a new password; existing profiles default to not requiring a change.
 
-## Hosting decisions
+## Appendix
+
+### Hosting decisions
 - Vercel (Next.js) + Supabase cloud (Postgres/Auth/Realtime), same region. Live from phase 1; every phase ends deployed.
 - CI (GitHub Actions): importer tests + lint + typecheck + build on every push/PR; Vercel previews per PR.
 - Invite-only auth (public sign-up disabled); service key server-side only; security headers.
 - Daily keep-alive ping to `/api/health` so the free-tier DB never pauses during review.
 
-## Phase log
-| Phase | Asked Copilot for | What I fixed / redirected by hand | Time |
+Submission references: [AI conversation summary](./docs/ai-conversation-summary.md), [architecture flowchart](./docs/flowchart.png), [data-handling decision flow](./docs/thinking.png), and [README](./README.md).
+
+### Phase log
+| Phase | Prompt / goal | What I fixed / redirected by hand | Gate / evidence |
 |---|---|---|---|
 | 0 Audit | Audit the source workbook, data quality, funnel labels, and operating assumptions before implementation. | Documented the source-to-domain decisions: Metro vs. property location, blank vs. zero, unmapped stages, derived pricing, colored-text provenance, missing State inference, and weekly-row selection. | Complete before Phase 1; assumptions recorded above |
 | 1 Scaffold | Build the Next.js 15, TypeScript, Tailwind, shadcn, and Supabase app shell with auth, protected navigation, health endpoint, formatting helpers, and security headers. | Kept database-dependent reads explicit until schema deployment; configured invite-only sign-in and security headers. Later fixed `/api/health` to use a server-only service client so its unauthenticated DB check respects RLS. | Lint, typecheck, build, and production health passed |
@@ -42,7 +75,7 @@ _Audited the workbook first, wrote a deterministic normalizer with tests before 
 | 9 Cloud import | Move workbook ingestion into the hosted app with an ExcelJS normalizer, parity tests, dry-run diff, conflict handling, and audit logging. | Completed in Phase 15 (in-app workbook import with dry-run diff, private storage archive, and transactional apply). | Completed in Phase 15 |
 | 10 Review fixes | Fix importer CI, weekly attention dates and new-deal ordering, snapshot permissions, history, deck provenance, typed attributes, and column-level RLS. | Tracked the workbook and removed generated files; added deterministic date extraction and tests; backfilled and preserved deal creation dates; aligned snapshot RLS; added named, quieter history and attribute diffs; unified unconfirmed formatting; validated attribute types and retained provenance; restricted editor columns and renamed the role helper. Applied migration 0004 and reseeded. Production verification showed Seattle's Nov 25 alert, named drawer history without version noise, leadership snapshot save, viewer save hidden, and RLS checks passing. | Lint, typecheck, 13 web tests, build, 42 Python tests, and production checks passed |
 | 11 Admin | Implement admin access control, shared presence, usage/users/activity/data-health tabs, role preview, `/me`, and required audit logging. | Implemented Parts A–E; applied migration 0005, regenerated types, committed and deployed as `205e94f`. Added an authorization regression test and documented production evidence in `730b3b6`. Authenticated two-browser checks for presence, user scope/deactivation, and role-preview interaction remain unverified. | Lint, typecheck, 18 web tests, build, CI, production migration and RLS passed |
-| 12 Rollup/reviewer readiness | Build the stretch rollup, add reviewer-facing README instructions/architecture, and run production submission checks. | Added the rollup and role-authenticated HTML/CSV smoke script; documented live URL, health, demo roles, quick demo, architecture, process log, plan, and CI. Set GitHub `APP_URL` to the production alias and manually ran keepalive successfully. Verified production has 18 deals, Seattle at $217.77/SF, and Listed mapped to Needs review. Final production smoke passed for all five demo roles on `/deals`, `/weekly` (including Seattle Nov 25), and `/rollup`; admin CSV returned a valid CSV response. Health reports `{ok:true, db:true, deals:18}` and both CI jobs passed. The Maps view/cloud import remain deferred; interactive acceptance gaps are noted in the submission report. | Lint, typecheck, 18 web tests, 42 Python tests, build, production smoke, health, keepalive, and CI passed |
+| 12 Rollup/reviewer readiness | Build the stretch rollup, add reviewer-facing README instructions/architecture, and run production submission checks. | Added the rollup and role-authenticated HTML/CSV smoke script; documented live URL, health, demo roles, quick demo, architecture, process log, plan, and CI. Set GitHub `APP_URL` to the production alias and manually ran keepalive successfully. Verified production has 18 deals, Seattle at $217.77/SF, and Listed mapped to Needs review. Final production smoke passed for all five demo roles on `/deals`, `/weekly` (including Seattle Nov 25), and `/rollup`; admin CSV returned a valid CSV response. Health reports `{ok:true, db:true, deals:18}` and both CI jobs passed. Map and in-app import were deferred at this point and completed in Phases 15–16. | Lint, typecheck, 18 web tests, 42 Python tests, build, production smoke, health, keepalive, and CI passed |
 | 13 Auth email flows | Fix callbacks, password setup and resets, temporary-password account creation, and CSV event filtering. | Approved and applied migration 0006 for the missing profile flag and RLS restriction; regenerated types. Configured the production site URL and redirect allow list and disabled public signup. Verified a generated invite link and session without sending email, then removed the test user. The free-tier default email provider does not allow custom templates, so default invite fragments are supported; cross-device recovery requires custom SMTP and the documented token-hash templates. End-to-end email delivery has not been verified. | Lint, typecheck, web tests, build, and isolated and production rollback RLS tests passed |
 | 14 Config editor | Replace the read-only vertical configuration with an admin editor and source-tab registry, then wire live configuration through Operations, Weekly Review, Rollup, and the importer. | Added migrations 0007 and 0008 for config metadata, source tabs, validation, auditing, rename/reorder RPCs, and the service-role/importer permissions. Added the admin Verticals & tabs editor; wired active/order behavior into the views; switched the importer to live mappings when configured, retaining an offline-only fallback and flagging unknown tabs. Seed now inserts only missing config defaults. Production checks passed for rename propagation/restoration, attribute-column add/remove and value retention, reorder/restoration, audit logging, role-scoped deal edits, restricted columns, viewer denial, leadership snapshot insertion, and inactive-vertical behavior (hidden in Weekly Review and badged in the rendered Operations grid). Test data/config were restored. `database.types.ts` was manually synchronized with the deployed schema; CLI type generation was unavailable because no Supabase access token or database password is configured. Commit `44f8fa1` is deployed; CI passed both jobs, production health reports 18 deals, and authenticated post-deploy role smoke passed. | Lint, typecheck, 36 web tests, build, 44 Python tests, live importer, production DB/UI acceptance, both CI jobs, and post-deploy smoke passed |
 | 15 Cloud import | Move workbook ingestion into the hosted app with an ExcelJS normalizer matching Python parity, private storage archive, dry-run reconciliation/diff/conflicts, and transactional apply RPC. | Ported `scripts/normalize.py` to pure TypeScript (`src/lib/import/{status-map,columns,normalize}.ts`) with ExcelJS font-color assumption detection, cached/uncached formula handling, banker's rounding, and strict tab registry mode for in-app previews. Added Vitest parity test (`TS == Python`) and 8 ported importer checks, and updated CI `web` job to run Python normalization before `npm test`. Added migration `0009_imports.sql` (numbered 0009 because `0008_vertical_config_permissions.sql` already existed) with admin-only `import_runs`, private `imports/` Storage bucket, `deal_history.detail` trigger propagation, and transactional `apply_import(run_id, decisions)` RPC. Built Admin → Data import tab (10 MB signed-URL upload to private storage, Node Server Action parse, reconciliation, field-level diff, app-edit/confirmed conflict resolution defaulting to keep app value, missing-row Hold/Leave controls, unconfigured-tab assignment workflow in Verticals & tabs with preview refresh, and import history). Applied `0009_imports.sql` to production Supabase and passed rolled-back RLS checks. Deployed commit `6af85fb`; CI run `45217123811` passed both jobs (`TS == Python` parity). Live production verification passed all 5 acceptance checks: (1) CI parity passed; (2) `data/src.xlsx` preview reported 18 rows in, 18 deals, 4 flagged, 1 assumed, 18 Unchanged; (3) modified workbook showed 1 Changed (`nego psa` → `Negotiating PSA`), 2 New (new catering row + `food_clientD_mia` row), and `food_clientD_mia` as unconfigured — after assigning and applying, deals rendered on live `/deals` and `/weekly` with `deal_history.detail` and `activity_log` `import` event; (4) editing `av_clientC_atl:2` notes in-app then re-importing `data/src.xlsx` flagged `notes` as `edited_in_app` conflict and preserved the app value by default; (5) non-admin (`viewer`/`analyst`) redirected away from `/admin?tab=import` (HTTP 307 → `/deals`) and blocked by RLS/RPC/Storage policies (`import_runs`, `apply_import`, `imports/`). Test data and storage files were restored cleanly; `/api/health` reports `{ok:true, db:true, deals:18}`. | Lint, typecheck, 55 web tests (incl. parity), 44 Python tests, build, CI run `45217123811`, production migration + RLS, all 5 acceptance checks, and 5-role smoke passed |
@@ -50,9 +83,9 @@ _Audited the workbook first, wrote a deterministic normalizer with tests before 
 | 17 LLM enrich | Verify all 18 ground-truth labels, make `JSON_SCHEMA` OpenAI strict-mode compatible (`evidence` array of `{field, quote}`), run real LLM enrichment + evaluation, seed enrichment-only, and build human AI review in Operations, Admin, Weekly Review, and PPTX. | User confirmed all 18 labels in `scripts/llm_labels.json` (`verified: true`); `eval_llm.py` refuses unverified labels. Updated `JSON_SCHEMA` for OpenAI strict mode (`additionalProperties: false`, all keys required, `evidence` as `{field, quote}[]`, no unsupported bounds) with strict-mode schema tests in Python and TypeScript. Ran `scripts/llm_enrich.py` with `openai/gpt-6-luna` across all 18 deals (18 API calls, 9,008 input + 9,149 output = 18,157 tokens), wrote `docs/llm-eval.md` (74.3% overall; 100% `key_dates`, `suggested_stage`, `weekly_note` quality), and ran `scripts/seed.py --enrichment-only` against production Supabase (SQL diff proved 0 numeric source fields or `stage` changed; 54 enrichment history rows, 0 protected rows). Added Deal drawer "AI suggestions" panel (Accept, Edit & accept, Dismiss with `ai_review` audit log, rate-limited Regenerate with no-key no-op), Admin → Data health "AI suggestions awaiting review (n)" list, and Weekly Review / PPTX `"AI-drafted note"` legend + violet italic styling. Rolled-back production RLS test verified `37 S Hudson St` (`food_clientA_nyc:6`) has verbatim evidence `"closing 11/25"`, and `lead.food` / `admin` can accept while `analyst.a` is blocked (`insufficient_privilege`). | Lint, typecheck, 83 web tests, 47 Python tests, build, live enrichment + `--enrichment-only` seed, and rolled-back RLS checks passed |
 | 18 E2E acceptance | Build a 12-file Playwright E2E acceptance suite covering every previously unverified production check, a 25-session 60 s load check, manual GitHub workflow, and automated `PROCESS_LOG` checklist updater. | Added `e2e/playwright.config.ts` (1 worker, trace on failure, HTML/JSON reports in `e2e/report/`), isolated-context `loginAs(role)` fixture (`E2E_PASSWORD` from env only), `E2E_ALLOW_RESET=1`-guarded service-role restore helpers, and `globalSetup`/`globalTeardown` SHA-256 deals editable-column hash verification. Implemented all 12 specs (`assumptions`, `realtime`, `pptx`, `presence`, `scopes`, `deactivation`, `role-preview`, `csv`, `onboarding`, `concurrency`, `permissions-matrix`, `weekly-content`). Fixed two real UX issues uncovered by the suite: added seconds (`HH:mm:ss`) to Weekly Review's live `as of` timestamp (`e1d6305`) and redirected `must_change_password` users straight to `/auth/set-password` inside `signIn` (`f68c4df`). Ran `npm run e2e:prod` against `https://atoms-website-three.vercel.app`: **16/16 tests passed (3.1m)** and before/after deals hash matched (`6f67f0e35e03`, 18 deals). Ran `e2e/load.mjs` (25 concurrent authenticated sessions hitting `/deals` + `/weekly` for 60 s) and recorded `docs/load-test.md`: 1,817 requests, **0.00% error rate**, `p50 = 776 ms`, `p95 = 1,523 ms`. Added manual-only `.github/workflows/e2e.yml` and ran `scripts/update_checklist.mjs` to regenerate the checklist (7/7 PASS) and clear the deferred signed-in checks bullet. | 16/16 Playwright prod E2E passed, hash MATCH, 0.00% load-test error rate, lint, typecheck, 83 web + 47 Python tests, and CI passed |
 
-## Phase 12 production checklist
+### Production acceptance checklist
 
-Verified via automated Playwright E2E suite on **2026-11-24** (commit `f68c4df`) · Report: [Playwright HTML report](e2e/report/index.html). Before/after deals editable hash: `6f67f0e35e03` → `6f67f0e35e03` (**MATCH**, 18 deals).
+Verified via automated Playwright E2E suite on **2026-11-24** (commit `f68c4df`) · Report: [Playwright HTML report](./e2e/report/index.html). Before/after deals editable hash: `6f67f0e35e03` → `6f67f0e35e03` (**MATCH**, 18 deals).
 
 1. **PASS** — Role/RLS enforcement and dynamic client-scope editing (`scopes.spec.ts`, `permissions-matrix.spec.ts`) — analyst Client A/B scope enforcement, live scope grant without re-login, revert, `admin_change` audit rows, and 5-role route access matrix verified.
 2. **PASS** — Admin confirmation and `lead.food` assumption actions (`assumptions.spec.ts`) — admin confirmed `400A` on `635 Angier Ave` (styling cleared + named history row), `lead.food` marked a Food assumption, and `analyst.a` had no Confirm action.
@@ -62,6 +95,10 @@ Verified via automated Playwright E2E suite on **2026-11-24** (commit `f68c4df`)
 6. **PASS** — Optimistic-lock concurrent editing (`concurrency.spec.ts`) — simultaneous edits to the same cell trigger the conflict toast (`Someone else edited this deal — reloaded`) and reload the winning value.
 7. **PASS** — Auth & temporary-password onboarding (`onboarding.spec.ts`) — admin-created temp-password user is forced to `/auth/set-password`, blocked from `/deals` until password is changed, then lands on `/deals` and is deleted cleanly in teardown.
 
-## What I'd do next
-- Add `NEXT_PUBLIC_GOOGLE_MAPS_KEY` (referrer-restricted, with billing enabled), a free `CENSUS_API_KEY` (to avoid Census ACS unauthenticated rate limits on shared cloud IPs), and optional `LLM_PROVIDER`/`LLM_MODEL`/`OPENAI_API_KEY` in Vercel environment variables.
-- Consider Google Workspace SSO and scheduled weekly deck delivery after submission.
+### What I'd do next
+
+- Configure a referrer-restricted `NEXT_PUBLIC_GOOGLE_MAPS_KEY` with billing enabled and a free `CENSUS_API_KEY` to avoid unauthenticated ACS rate limits on shared cloud IPs.
+- Configure custom SMTP and cross-device invite/reset templates; end-to-end email delivery is not yet verified.
+- Add Google Workspace SSO and scheduled weekly deck delivery.
+- Build two-way Google Sheets synchronization for a controlled migration period; the current import workflow is one-way.
+- Scale the importer to the original 170-tab workbook, with LLM-assisted header mapping and human approval before applying changes.
