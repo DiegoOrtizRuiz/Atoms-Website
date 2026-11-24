@@ -17,6 +17,8 @@
 | `suggested_stage` | 18 | 18 | 100.0% |
 | `weekly_note quality` | 18 | 18 | 100.0% |
 
+Trusted for dates and stage suggestions (100%); `next_step` and `deal_type` remain human-reviewed.
+
 ## Misses (notes vs. prediction vs. label)
 
 | Deal ID | Field | Source notes | Prediction | Label |

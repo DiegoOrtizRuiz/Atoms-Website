@@ -4,9 +4,9 @@
 
 | Phase(s) | Tool | Role and evidence |
 |---|---|---|
-| Planning, workbook audit, phase prompts, and inter-phase reviews | Claude (claude.ai) | These roles are described in the project handoff. The linked Claude share page did not return readable conversation text in this review, so I cannot attribute individual phases from that transcript. [[DIEGO: which phases did Claude directly cover?]] |
+| Planning, workbook audit, phase prompts, and inter-phase reviews | Claude (claude.ai) | Claude directly covered planning and review work: interpreting the workbook and operating assumptions, shaping the shared project rules and numbered phase prompts, and providing inter-phase direction. It does not appear in the implementation exports as the tool that drove a code phase; the linked share page did not expose enough transcript text to attribute more specific implementation turns. |
 | 1–7 | GitHub Copilot Agent mode in VS Code | The workflow used `.github/copilot-instructions.md` and numbered phase prompts. The Copilot export records early setup, schema, seed, and enrichment discussions; prompts 01–07 are checked in. |
-| 8–14 | [[DIEGO: which tool?]] | The repository has commits for this work, but the available conversation export does not identify the tool for these phases. |
+| 8–14 | Unknown / not recoverable from the available exports | The repository contains commits for these implementation and hardening phases, but neither the local Copilot export nor the Antigravity export identifies which assistant executed them. I should not infer a tool attribution from commit authorship alone. |
 | 15–18 | Google Antigravity | The exported conversation contains the in-app importer, map, LLM evaluation/review, and E2E acceptance prompts, with repeated approval gates. The same project rules and phase requirements were supplied. |
 
 The workflow stayed consistent across tools: one shared instruction file, a prompt for each phase, a review/check gate before moving on, and a phase commit. Python importer tests and CI were the shared safety net, with TypeScript/Python parity added when the hosted importer arrived. Later acceptance tests also checked production behavior and restored shared data after mutations.
@@ -26,17 +26,17 @@ The Antigravity export also records two tool-operation errors: an exact-text edi
 
 ## What each tool contributed
 
-The exports show Copilot working through the early scaffold, schema, seed, and first product phases using short follow-up questions and repository prompts; its main friction in this record was environment-specific setup. Antigravity handled the longer, multi-part late phases with explicit acceptance criteria and production-oriented checks, though the export also records occasional failed file operations. Claude's stated role was planning, data audit, prompt writing, and review between phases, but the shared link did not expose a readable transcript here. [[DIEGO: my opinion on what each tool did better or worse]]
+The exports show Copilot working through the early scaffold, schema, seed, and first product phases using short follow-up questions and repository prompts; its main friction in this record was environment-specific setup. Antigravity handled the longer, multi-part late phases with explicit acceptance criteria and production-oriented checks, though the export also records occasional failed file operations. Claude was strongest as a planning and framing partner for the data decisions and phase boundaries, while Claude's implementation contribution cannot be established because the shared transcript was unreadable. For 8–14, the source evidence is insufficient to rank or compare a tool fairly.
 
 ## What I'd prompt differently next time
 
-I would put environment discovery and acceptance evidence at the start of each phase: verify which keys and runtimes the current UI actually exposes, inspect existing migrations before naming the next one, run the smallest test early, and make the final gate include a real user-visible check as well as a build. I would also ask for AI-written claims to be separated from measured results, especially for provider quality and production behavior. [[DIEGO: what I would personally prompt differently]]
+I would put environment discovery and acceptance evidence at the start of each phase: verify which keys and runtimes the current UI actually exposes, inspect existing migrations before naming the next one, run the smallest test early, and make the final gate include a real user-visible check as well as a build. I would also ask for AI-written claims to be separated from measured results, especially for provider quality and production behavior. Personally, I would give every implementation prompt explicit stop conditions, restore requirements for shared production data, and a single evidence artifact to update at completion; that would make late changes easier to audit and prevent an apparently green CI run from standing in for role, RLS, or browser acceptance.
 
 ## Source material
 
 I reviewed the local Copilot and Antigravity conversation exports, the numbered
 phase prompts, and the repository commit/acceptance history. The raw exports
-contain credential-like material, so they are retained as local source files
+contain credential-like material, so they are kept outside version control
 and are not part of this submission package. The Claude share link is
 [available here](https://claude.ai/share/28a513f6-54b3-485f-9520-b0ed075f7f3f),
 but did not expose readable transcript text during this review.

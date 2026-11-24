@@ -25,6 +25,7 @@ __pycache__/
 *.pyc
 supabase/.temp/
 .venv/
+/docs/ai-chats/
 
 # next.js
 /.next/

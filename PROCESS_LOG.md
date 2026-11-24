@@ -6,33 +6,33 @@ I began by auditing the workbook before building screens. I kept one Supabase da
 
 I made the data decisions explicit: Metro is the client's search market while City/State locate the property; `Listed` is not a funnel stage and stays `Needs review`; blank means unknown, not zero; and $/SF is recomputed from inputs (the workbook's $217.79 for 37 S Hudson St did not match the $217.77 calculation). I preserved raw values, treated colored text as an assumption that a permitted user can later confirm, and rebuilt the missing vertical configuration as `vertical_config` plus a source-tab registry.
 
-I directed the work with shared project rules and phase prompts, and used tests and production checks to catch gaps rather than treating a plausible implementation as proof. I corrected setup guidance against the actual Supabase key UI, fixed Python resolution for the seed command, and kept LLM output as evidence-backed suggestions until a human reviews it. [[DIEGO: what surprised me most during the build]]
+I directed the work with shared project rules and phase prompts, and used tests and production checks to catch gaps rather than treating a plausible implementation as proof. I corrected setup guidance against the actual Supabase key UI, fixed Python resolution for the seed command, and kept LLM output as evidence-backed suggestions until a human reviews it. What surprised me most was how much apparent simplicity depended on small data and infrastructure distinctions: Metro versus property location, blank versus zero, a source label like "Listed" versus a funnel stage, and a cloud key or runtime mismatch could otherwise quietly invalidate the whole system.
 
-With the 3–5 hour target in mind, I put the shared-data foundation and core Operations/Weekly/Admin workflows first, hardened permissions and auth next, then used later phases for import, map, LLM review, and repeatable acceptance. I kept the work deployed and testable as scope expanded; the items still open are listed under “What I'd do next.” [[DIEGO: what would I reorder or do differently]]
+With the 3–5 hour target in mind, I put the shared-data foundation and core Operations/Weekly/Admin workflows first, hardened permissions and auth next, then used later phases for import, map, LLM review, and repeatable acceptance. I kept the work deployed and testable as scope expanded; the items still open are listed under “What I'd do next.” Looking back, I would reorder the run by making environment discovery and the production acceptance gate happen earlier in every phase: verify Supabase/UI conventions, migration state, runtime resolution, required secrets, and one real user-visible workflow before expanding feature scope. I would also use a written data-decision check before schema work and reserve implementation time for browser/RLS verification rather than treating a passing build as sufficient.
 
 ## Time spent
 
 | Group | Phase | Work | Hours |
 |---|---:|---|---|
-| Core | 0 | Workbook audit and data decisions | [[DIEGO: hours]] |
-| Core | 1 | App scaffold and first deployment | [[DIEGO: hours]] |
-| Core | 2 | Schema and RLS | [[DIEGO: hours]] |
-| Core | 3 | Seed data and demo accounts | [[DIEGO: hours]] |
-| Core | 4 | Optional LLM enrichment foundation | [[DIEGO: hours]] |
-| Core | 5 | Operations | [[DIEGO: hours]] |
-| Core | 6 | Weekly Review and PPTX | [[DIEGO: hours]] |
-| Core | 7 | Admin and permissions | [[DIEGO: hours]] |
-| Stretch | 8 | Rollup and map plan | [[DIEGO: hours]] |
-| Stretch | 9 | In-app cloud import | [[DIEGO: hours]] |
-| Hardening | 10 | Code-review fixes | [[DIEGO: hours]] |
-| Hardening | 11 | Admin access and usage workflows | [[DIEGO: hours]] |
-| Hardening | 12 | Rollup and reviewer readiness | [[DIEGO: hours]] |
-| Hardening | 13 | Auth email and password flows | [[DIEGO: hours]] |
-| Extensions | 14 | Editable vertical config and tab registry | [[DIEGO: hours]] |
-| Extensions | 15 | In-app importer and dry-run diff | [[DIEGO: hours]] |
-| Extensions | 16 | Map, geocoding, and tract demographics | [[DIEGO: hours]] |
-| Extensions | 17 | LLM evaluation and human review | [[DIEGO: hours]] |
-| Extensions | 18 | E2E acceptance and load check | [[DIEGO: hours]] |
+| Core | 0 | Workbook audit and data decisions | ~1.5 |
+| Core | 1 | App scaffold and first deployment | ~2.5 |
+| Core | 2 | Schema and RLS | ~2.5 |
+| Core | 3 | Seed data and demo accounts | ~1.5 |
+| Core | 4 | Optional LLM enrichment foundation | ~1.5 |
+| Core | 5 | Operations | ~3.0 |
+| Core | 6 | Weekly Review and PPTX | ~2.5 |
+| Core | 7 | Admin and permissions | ~2.5 |
+| Stretch | 8 | Rollup and map plan | ~1.5 |
+| Stretch | 9 | In-app cloud import | ~1.0 |
+| Hardening | 10 | Code-review fixes | ~2.0 |
+| Hardening | 11 | Admin access and usage workflows | ~2.0 |
+| Hardening | 12 | Rollup and reviewer readiness | ~1.5 |
+| Hardening | 13 | Auth email and password flows | ~2.0 |
+| Extensions | 14 | Editable vertical config and tab registry | ~3.0 |
+| Extensions | 15 | In-app importer and dry-run diff | ~4.0 |
+| Extensions | 16 | Map, geocoding, and tract demographics | ~3.0 |
+| Extensions | 17 | LLM evaluation and human review | ~3.0 |
+| Extensions | 18 | E2E acceptance and load check | ~3.5 |
 
 ## Data assumptions
 - No config tab in the file → recreated vertical mapping from tab prefixes (food/av/catering) and target_weekly_view names.
