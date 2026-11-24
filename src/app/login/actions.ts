@@ -61,6 +61,16 @@ export async function signIn(
     };
   }
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("must_change_password")
+    .eq("id", data.user.id)
+    .maybeSingle();
+
+  if (profile?.must_change_password) {
+    redirect("/auth/set-password");
+  }
+
   const requestedPath = formData.get("next");
   const destination = safeNextPath(typeof requestedPath === "string" ? requestedPath : null);
   redirect(destination);
