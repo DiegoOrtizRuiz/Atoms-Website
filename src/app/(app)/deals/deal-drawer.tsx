@@ -1,14 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, CalendarDays, History, MapPin, X } from "lucide-react";
+import { AlertTriangle, CalendarDays, History, MapPin, Pencil, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import type { CurrentUser } from "@/lib/auth";
 import { fmtDate, fmtMoney, fmtNumber, fmtOrDash } from "@/lib/format";
-import type { Deal, DealHistory } from "@/lib/deals";
+import { canEditDeal, type Deal, type DealHistory } from "@/lib/deals";
 import type { Database } from "@/lib/database.types";
 import { expandHistoryEntry } from "@/lib/history";
-import { loadDealHistory } from "./actions";
+import { loadDealHistory, updateDeal } from "./actions";
+import { AiSuggestionsPanel } from "./ai-suggestions-panel";
 
 function valueText(value: unknown) {
   if (value == null || value === "") return "—";
@@ -20,16 +24,32 @@ export function DealDrawer({
   deal,
   open,
   onOpenChange,
+  user,
+  onDealUpdated,
 }: {
   deal: Deal | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  user?: CurrentUser;
+  onDealUpdated?: (deal: Deal) => void;
 }) {
   const [history, setHistory] = useState<DealHistory[]>([]);
   const [authors, setAuthors] = useState<
     Database["public"]["Views"]["profile_names"]["Row"][]
   >([]);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [addressDraft, setAddressDraft] = useState("");
+  const [cityDraft, setCityDraft] = useState("");
+  const [stateDraft, setStateDraft] = useState("");
+  const [savingAddress, setSavingAddress] = useState(false);
+
+  useEffect(() => {
+    setEditingAddress(false);
+    setAddressDraft(deal?.address ?? "");
+    setCityDraft(deal?.city ?? "");
+    setStateDraft(deal?.state ?? "");
+  }, [deal?.id, deal?.address, deal?.city, deal?.state, open]);
 
   useEffect(() => {
     if (!open || !deal) return;
@@ -60,6 +80,51 @@ export function DealDrawer({
   const attributes = deal.attributes as Record<string, unknown>;
   const rawAttributes = deal.attributes_raw as Record<string, unknown>;
   const extracted = deal.notes_extracted as Record<string, unknown> | null;
+  const editable = Boolean(user && canEditDeal(user, deal));
+
+  async function saveAddressChanges() {
+    if (!deal) return;
+    setSavingAddress(true);
+    try {
+      let current = deal;
+      const fields: ["address" | "city" | "state", string][] = [
+        ["address", addressDraft.trim()],
+        ["city", cityDraft.trim()],
+        ["state", stateDraft.trim()],
+      ];
+      let savedAny = false;
+      for (const [field, nextRaw] of fields) {
+        const nextVal = nextRaw || null;
+        if ((current[field] ?? null) === nextVal) continue;
+        const result = await updateDeal({
+          dealId: current.id,
+          version: current.version,
+          field,
+          value: nextVal,
+        });
+        current = result.deal;
+        onDealUpdated?.(current);
+        if (result.conflict) {
+          toast.error("Someone else edited this deal — reloaded");
+          setEditingAddress(false);
+          return;
+        }
+        savedAny = true;
+      }
+      if (savedAny) {
+        toast.success(
+          current.geocode_status === "ok"
+            ? "Address updated and re-geocoded"
+            : "Address updated",
+        );
+      }
+      setEditingAddress(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to update address.");
+    } finally {
+      setSavingAddress(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
@@ -76,10 +141,68 @@ export function DealDrawer({
               <h2 className="text-xl font-semibold text-slate-950">
                 {fmtOrDash(deal.address)}
               </h2>
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
+              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-slate-500">
                 <MapPin className="size-3.5" />
                 {[deal.city, deal.state].filter(Boolean).join(", ") || "—"}
+                {deal.state_inferred ? (
+                  <Badge className="border-amber-300 bg-amber-50 text-[10px] text-amber-800" variant="outline">
+                    state inferred
+                  </Badge>
+                ) : null}
+                {editable && !editingAddress ? (
+                  <button
+                    className="ml-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    onClick={() => setEditingAddress(true)}
+                    type="button"
+                  >
+                    <Pencil className="size-3" />
+                    Edit address
+                  </button>
+                ) : null}
               </p>
+              {editingAddress ? (
+                <div className="mt-3 space-y-2 rounded-lg border bg-slate-50 p-3">
+                  <div className="grid gap-2">
+                    <Input
+                      aria-label="Street address"
+                      onChange={(event) => setAddressDraft(event.target.value)}
+                      placeholder="Street address"
+                      value={addressDraft}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        aria-label="City"
+                        onChange={(event) => setCityDraft(event.target.value)}
+                        placeholder="City"
+                        value={cityDraft}
+                      />
+                      <Input
+                        aria-label="State"
+                        onChange={(event) => setStateDraft(event.target.value)}
+                        placeholder="State (e.g. GA)"
+                        value={stateDraft}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      disabled={savingAddress}
+                      onClick={() => void saveAddressChanges()}
+                      size="sm"
+                    >
+                      {savingAddress ? "Saving…" : "Save & geocode"}
+                    </Button>
+                    <Button
+                      disabled={savingAddress}
+                      onClick={() => setEditingAddress(false)}
+                      size="sm"
+                      variant="outline"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
             {deal.needs_review ? (
               <Badge className="bg-amber-100 text-amber-800">Needs review</Badge>
@@ -143,6 +266,12 @@ export function DealDrawer({
             ) : null}
           </section>
 
+          <AiSuggestionsPanel
+            deal={deal}
+            onDealUpdated={onDealUpdated}
+            user={user}
+          />
+
           {deal.review_reasons.length ? (
             <section>
               <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -198,6 +327,8 @@ export function DealDrawer({
                   source_tab: deal.source_tab,
                   source_row: deal.source_row,
                   stage_raw: deal.stage_raw,
+                  geocode_status: deal.geocode_status,
+                  census_tract_geoid: deal.census_tract_geoid,
                   attributes_raw: rawAttributes,
                 },
                 null,

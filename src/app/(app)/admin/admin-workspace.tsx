@@ -2,13 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CurrentUser } from "@/lib/auth";
+import { hasPendingAiSuggestions, pendingAiSections } from "@/lib/ai-suggestions";
 import type { Database, Json } from "@/lib/database.types";
 import { fmtDate, fmtNumber, fmtOrDash } from "@/lib/format";
 import { usePresenceMembers } from "@/lib/presence";
+import { geocodeMissingAdminDeals } from "./actions";
 import { ActivityPanel } from "./activity-panel";
 import type { ImportRunRecord } from "./import-actions";
 import { ImportPanel, type ImportRunListItem } from "./import-panel";
@@ -22,7 +26,19 @@ type SourceTab = Database["public"]["Tables"]["source_tabs"]["Row"];
 type LoginDay = Database["public"]["Functions"]["admin_logins_per_day"]["Returns"][number];
 type HealthDeal = Pick<
   Database["public"]["Tables"]["deals"]["Row"],
-  "id" | "stage" | "needs_review" | "review_reasons" | "stage_raw" | "field_provenance" | "address"
+  | "id"
+  | "stage"
+  | "needs_review"
+  | "review_reasons"
+  | "stage_raw"
+  | "field_provenance"
+  | "address"
+  | "weekly_note"
+  | "notes_extracted"
+  | "geocode_status"
+  | "lat"
+  | "lng"
+  | "census_tract_geoid"
 >;
 type AdminTab = "overview" | "users" | "activity" | "health" | "verticals" | "import";
 
@@ -128,10 +144,12 @@ function DataHealth({
   deals: HealthDeal[];
   lastImportAt: string | null;
 }) {
+  const router = useRouter();
+  const [geocoding, setGeocoding] = useState(false);
+
   const stages = new Map<string, number>();
   const rawStages = new Map<string, number>();
   let assumed = 0;
-  let suggested = 0;
   for (const deal of deals) {
     stages.set(deal.stage, (stages.get(deal.stage) ?? 0) + 1);
     if (deal.stage === "Needs review" && deal.stage_raw) {
@@ -139,11 +157,35 @@ function DataHealth({
     }
     for (const value of Object.values(record(deal.field_provenance))) {
       if (value === "assumed") assumed++;
-      if (value === "llm_suggested") suggested++;
     }
   }
   const missingAddress = deals.filter((deal) => !deal.address?.trim());
   const needsReview = deals.filter((deal) => deal.needs_review);
+  const aiAwaitingReview = deals.filter((deal) => hasPendingAiSuggestions(deal));
+  const geocodedOk = deals.filter((deal) => deal.geocode_status === "ok").length;
+  const geocodeNoAddress = deals.filter((deal) => deal.geocode_status === "no_address").length;
+  const geocodeFailed = deals.filter(
+    (deal) => deal.geocode_status === "not_found" || deal.geocode_status === "error",
+  ).length;
+  const geocodePending = deals.filter((deal) => deal.geocode_status === null).length;
+
+  async function runGeocodeMissing() {
+    setGeocoding(true);
+    try {
+      const summary = await geocodeMissingAdminDeals();
+      const demoPart = summary.demographics
+        ? ` Tracts: ${summary.demographics.refreshed} fetched, ${summary.demographics.cached} cached.`
+        : "";
+      toast.success(
+        `Geocoded ${summary.processed} deal(s): ${summary.ok} ok, ${summary.no_address} no address, ${summary.not_found} not found, ${summary.error} error.${demoPart}`,
+      );
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to geocode deals.");
+    } finally {
+      setGeocoding(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -151,7 +193,7 @@ function DataHealth({
         <StatCard label="Total deals" value={deals.length} />
         <StatCard label="Needs review" value={needsReview.length} />
         <StatCard label="Assumed cells" value={assumed} />
-        <StatCard label="LLM-suggested pending" value={suggested} />
+        <StatCard label="AI suggestions awaiting review" value={aiAwaitingReview.length} />
       </div>
       <Card>
         <CardHeader><CardTitle>Deals by stage</CardTitle></CardHeader>
@@ -195,6 +237,72 @@ function DataHealth({
         <Card>
           <CardHeader><CardTitle>Last seed/import</CardTitle></CardHeader>
           <CardContent><p>{fmtDate(lastImportAt, "PPpp")}</p></CardContent>
+        </Card>
+        <Card className="xl:col-span-2">
+          <CardHeader>
+            <CardTitle>AI suggestions awaiting review ({aiAwaitingReview.length})</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Deals with unconfirmed AI-drafted notes or extracted facts. Open any deal to accept, edit, or dismiss.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {aiAwaitingReview.length ? aiAwaitingReview.map((deal) => {
+              const pending = pendingAiSections(deal);
+              return (
+                <a
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-violet-200 bg-violet-50/40 p-3 text-sm hover:bg-violet-50"
+                  href={`/deals?deal=${encodeURIComponent(deal.id)}`}
+                  key={deal.id}
+                >
+                  <div className="min-w-0">
+                    <span className="font-medium">{deal.address || deal.id}</span>
+                    <span className="ml-2 font-mono text-xs text-muted-foreground">{deal.id}</span>
+                    {deal.weekly_note ? (
+                      <p className="mt-0.5 truncate text-xs italic text-slate-600">{deal.weekly_note}</p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {pending.map((section) => (
+                      <Badge className="text-[10px]" key={section} variant="secondary">
+                        {section.replaceAll("_", " ")}
+                      </Badge>
+                    ))}
+                  </div>
+                </a>
+              );
+            }) : <p className="text-sm text-muted-foreground">All AI suggestions have been reviewed.</p>}
+          </CardContent>
+        </Card>
+        <Card className="xl:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
+            <div>
+              <CardTitle>Geocoding &amp; tract coverage</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                US Census Geocoder (no key required) with optional Google fallback. Deals without an address stay off the map.
+              </p>
+            </div>
+            <Button disabled={geocoding} onClick={() => void runGeocodeMissing()} size="sm">
+              {geocoding ? "Geocoding…" : "Geocode missing"}
+            </Button>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-4">
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">Geocoded (ok)</p>
+              <p className="mt-1 text-xl font-semibold">{fmtNumber(geocodedOk)}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">No address</p>
+              <p className="mt-1 text-xl font-semibold">{fmtNumber(geocodeNoAddress)}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">Not found / error</p>
+              <p className="mt-1 text-xl font-semibold">{fmtNumber(geocodeFailed)}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">Pending</p>
+              <p className="mt-1 text-xl font-semibold">{fmtNumber(geocodePending)}</p>
+            </div>
+          </CardContent>
         </Card>
       </div>
     </div>

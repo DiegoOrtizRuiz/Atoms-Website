@@ -4,7 +4,7 @@ from datetime import date
 import pytest
 
 from llm_enrich import PROTECTED_FIELDS, enrich_deals
-from llm_schema import normalize_yearless_dates, validate_extraction
+from llm_schema import JSON_SCHEMA, normalize_yearless_dates, validate_extraction
 from eval_llm import evaluate
 
 
@@ -17,7 +17,7 @@ def extraction(**changes):
         "next_step": None,
         "deal_type": "unknown",
         "weekly_note": "Follow up with broker",
-        "evidence": {},
+        "evidence": [],
         "confidence": 0.8,
         "suggested_stage": None,
         "suggested_stage_reason": None,
@@ -51,7 +51,7 @@ def test_enrichment_preserves_source_fields_and_adds_only_suggestions(deal):
                 }
             ],
             price_context="deposit $250,000",
-            evidence={"price_context": "deposit $250,000"},
+            evidence=[{"field": "price_context", "quote": "deposit $250,000"}],
         ),
         {},
     )
@@ -118,7 +118,7 @@ def test_validation_rejects_unquoted_evidence():
     with pytest.raises(ValueError, match="exact substrings"):
         validate_extraction(
             extraction(
-                evidence={"next_step": "seller will respond tomorrow"},
+                evidence=[{"field": "next_step", "quote": "seller will respond tomorrow"}],
             ),
             notes="awaiting seller response",
             stage="In Pipeline",
@@ -168,6 +168,7 @@ def test_evaluation_reports_per_field_scores():
     labels = [
         {
             "id": "deal:1",
+            "verified": True,
             "deal_type": "buy",
             "negotiated_price": 3000000,
             "price_context": "agreed to $3M",
@@ -184,3 +185,82 @@ def test_evaluation_reports_per_field_scores():
 
     assert scores
     assert set(scores.values()) == {1.0}
+
+
+def test_evaluate_refuses_unverified_labels():
+    with pytest.raises(SystemExit, match="Refusing to report accuracy"):
+        evaluate(
+            [{"id": "deal:1", "notes_extracted": extraction()}],
+            [
+                {
+                    "id": "deal:1",
+                    "verification_status": "TODO verify",
+                    "deal_type": "unknown",
+                    "negotiated_price": None,
+                    "price_context": None,
+                    "has_key_date": False,
+                    "has_risk": False,
+                    "has_next_step": False,
+                    "suggested_stage": None,
+                }
+            ],
+        )
+
+
+def test_json_schema_is_openai_strict_mode_compatible():
+    """Validate every node in JSON_SCHEMA against OpenAI Structured Outputs strict rules."""
+    unsupported_keywords = {
+        "minLength",
+        "maxLength",
+        "pattern",
+        "format",
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "multipleOf",
+        "minItems",
+        "maxItems",
+        "uniqueItems",
+        "patternProperties",
+        "additionalItems",
+        "minProperties",
+        "maxProperties",
+    }
+
+    assert JSON_SCHEMA["type"] == "object"
+    assert JSON_SCHEMA["properties"]["evidence"]["type"] == "array"
+    evidence_item = JSON_SCHEMA["properties"]["evidence"]["items"]
+    assert evidence_item["type"] == "object"
+    assert set(evidence_item["properties"]) == {"field", "quote"}
+    assert evidence_item["additionalProperties"] is False
+    assert set(evidence_item["required"]) == {"field", "quote"}
+
+    def check_node(node: dict, path: str) -> None:
+        bad = set(node) & unsupported_keywords
+        assert not bad, f"Unsupported OpenAI strict keyword(s) at {path}: {bad}"
+
+        if node.get("type") == "object":
+            assert node.get("additionalProperties") is False, (
+                f"Object at {path} must set additionalProperties: False"
+            )
+            props = node.get("properties")
+            assert isinstance(props, dict), f"Object at {path} must define properties"
+            required = node.get("required")
+            assert isinstance(required, list), f"Object at {path} must define required"
+            assert set(required) == set(props), (
+                f"Object at {path} must require every property: "
+                f"required={set(required)} vs properties={set(props)}"
+            )
+            for key, child in props.items():
+                check_node(child, f"{path}.{key}")
+
+        if "items" in node and isinstance(node["items"], dict):
+            check_node(node["items"], f"{path}[]")
+
+        for combinator in ("anyOf", "oneOf", "allOf"):
+            if combinator in node:
+                for idx, branch in enumerate(node[combinator]):
+                    check_node(branch, f"{path}.{combinator}[{idx}]")
+
+    check_node(JSON_SCHEMA, "$")

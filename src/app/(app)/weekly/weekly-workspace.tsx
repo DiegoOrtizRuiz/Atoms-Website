@@ -78,7 +78,7 @@ function WeeklyCell({
         provenance === "assumed"
           ? "Assumption — not yet confirmed"
           : provenance === "llm_suggested"
-            ? "LLM suggestion — review before confirming"
+            ? "AI-drafted note — review before confirming"
             : undefined
       }
     >
@@ -534,7 +534,7 @@ export function WeeklyWorkspace({
           </span>
           <span className="flex items-center gap-2 italic">
             <span className="size-1.5 rounded-full bg-violet-500" />
-            LLM suggestion — review before confirming
+            AI-drafted note — review before confirming
           </span>
         </div>
       </main>

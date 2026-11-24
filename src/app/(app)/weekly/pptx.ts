@@ -22,37 +22,31 @@ function compactMoney(value: number | null) {
   return fmtMoney(value);
 }
 
+function styledCell(text: string, provenance: unknown) {
+  const unconfirmed = isUnconfirmed(provenance);
+  if (!unconfirmed) {
+    return { text, options: { italic: false } };
+  }
+  const color = provenance === "llm_suggested" ? COLORS.violet : COLORS.amber;
+  return {
+    text: `● ${text}`,
+    options: { italic: true, color },
+  };
+}
+
 function tableRow(row: WeeklyRow) {
   return [
-    {
-      text: row.market || "—",
-      options: { italic: isUnconfirmed(row.fieldProvenance.market) },
-    },
-    {
-      text: [row.address || "—", row.location].filter(Boolean).join("\n"),
-      options: { italic: isUnconfirmed(row.fieldProvenance.address) },
-    },
-    {
-      text: row.stage,
-      options: { italic: isUnconfirmed(row.fieldProvenance.stage) },
-    },
-    {
-      text: compactMoney(row.listPrice),
-      options: { italic: isUnconfirmed(row.fieldProvenance.list_price) },
-    },
-    {
-      text: fmtNumber(row.buildingSf),
-      options: { italic: isUnconfirmed(row.fieldProvenance.bldg_sf) },
-    },
+    styledCell(row.market || "—", row.fieldProvenance.market),
+    styledCell(
+      [row.address || "—", row.location].filter(Boolean).join("\n"),
+      row.fieldProvenance.address,
+    ),
+    styledCell(row.stage, row.fieldProvenance.stage),
+    styledCell(compactMoney(row.listPrice), row.fieldProvenance.list_price),
+    styledCell(fmtNumber(row.buildingSf), row.fieldProvenance.bldg_sf),
     { text: row.pricePerSf == null ? "—" : `$${row.pricePerSf}/SF` },
-    {
-      text: fmtNumber(row.lotSf),
-      options: { italic: isUnconfirmed(row.fieldProvenance.lot_sf) },
-    },
-    {
-      text: row.notes || "—",
-      options: { italic: isUnconfirmed(row.fieldProvenance[row.notesField]) },
-    },
+    styledCell(fmtNumber(row.lotSf), row.fieldProvenance.lot_sf),
+    styledCell(row.notes || "—", row.fieldProvenance[row.notesField]),
   ];
 }
 
@@ -246,11 +240,11 @@ export async function exportWeeklyPptx(model: WeeklyModel) {
         line: { color: COLORS.border, pt: 0.5 },
       });
       slide.addText(
-        "● Assumed   ● LLM suggested — italic values remain to be confirmed",
+        "● Assumed   ● AI-drafted note — italic values remain to be confirmed",
         {
           x: 0.5,
           y: 6.85,
-          w: 8,
+          w: 8.5,
           h: 0.22,
           color: COLORS.slate,
           fontSize: 9,

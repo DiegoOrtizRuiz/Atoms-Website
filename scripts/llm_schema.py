@@ -17,6 +17,11 @@ STAGES = [
     "On Hold",
 ]
 
+# OpenAI Structured Outputs (strict: true) compatible JSON Schema:
+# - Every object node sets additionalProperties: false
+# - Every object node lists all properties in required
+# - No unsupported validation keywords (maxLength, minimum, maximum, etc.);
+#   those bounds are enforced in validate_extraction().
 JSON_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -39,13 +44,26 @@ JSON_SCHEMA = {
         "risks": {"type": "array", "items": {"type": "string"}},
         "next_step": {"type": ["string", "null"]},
         "deal_type": {"type": "string", "enum": ["buy", "lease", "unknown"]},
-        "weekly_note": {"type": "string", "maxLength": 180},
+        "weekly_note": {"type": "string"},
         "evidence": {
-            "type": "object",
-            "additionalProperties": {"type": "string"},
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "field": {"type": "string"},
+                    "quote": {"type": "string"},
+                },
+                "required": ["field", "quote"],
+            },
         },
-        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
-        "suggested_stage": {"type": ["string", "null"], "enum": [*STAGES, None]},
+        "confidence": {"type": "number"},
+        "suggested_stage": {
+            "anyOf": [
+                {"type": "string", "enum": STAGES},
+                {"type": "null"},
+            ]
+        },
         "suggested_stage_reason": {"type": ["string", "null"]},
     },
     "required": [
@@ -109,19 +127,29 @@ def validate_extraction(value: Any, *, notes: str, stage: str) -> dict[str, Any]
         )
     _require(isinstance(value["weekly_note"], str), "weekly_note must be a string.")
     _require(
+        len(value["weekly_note"]) <= 180,
+        "weekly_note must be at most 180 characters.",
+    )
+    _require(
         len(value["weekly_note"].split()) <= 12,
         "weekly_note must contain no more than 12 words.",
     )
-    _require(
-        isinstance(value["evidence"], dict)
-        and all(
-            isinstance(key, str) and isinstance(quote, str)
-            for key, quote in value["evidence"].items()
-        ),
-        "evidence must map field names to strings.",
-    )
-    for quote in value["evidence"].values():
-        _require(quote in notes, "Evidence quotes must be exact substrings of notes.")
+    evidence = value["evidence"]
+    _require(isinstance(evidence, list), "evidence must be an array of {field, quote} objects.")
+    for entry in evidence:
+        _require(
+            isinstance(entry, dict)
+            and set(entry) == {"field", "quote"}
+            and isinstance(entry["field"], str)
+            and bool(entry["field"].strip())
+            and isinstance(entry["quote"], str)
+            and bool(entry["quote"]),
+            "Each evidence entry must contain non-empty string field and quote.",
+        )
+        _require(
+            entry["quote"] in notes,
+            f"Evidence quotes must be exact substrings of notes (failed for {entry['field']}: {entry['quote']!r}).",
+        )
     _require(
         isinstance(value["confidence"], (int, float))
         and not isinstance(value["confidence"], bool)

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
-const eventValues = ["login", "page_view", "deal_edit", "admin_change", "snapshot", "csv_export", "password_set", "config_change", "import"] as const;
+const eventValues = ["login", "page_view", "deal_edit", "admin_change", "snapshot", "csv_export", "password_set", "config_change", "import", "ai_review"] as const;
 const uuid = z.uuid();
 
 function csvCell(value: unknown) {

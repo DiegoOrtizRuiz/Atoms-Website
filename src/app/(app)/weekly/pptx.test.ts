@@ -1,13 +1,13 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import type { WeeklyModel, WeeklyRow } from "@/lib/weekly";
 
-const mocks = vi.hoisted(() => ({ addTable: vi.fn() }));
+const mocks = vi.hoisted(() => ({ addTable: vi.fn(), addText: vi.fn() }));
 vi.mock("pptxgenjs", () => ({
   default: class {
     ShapeType = { roundedRect: "roundedRect", line: "line" };
     addSlide() {
       return {
-        addText: vi.fn(),
+        addText: mocks.addText,
         addShape: vi.fn(),
         addTable: mocks.addTable,
       };
@@ -20,9 +20,12 @@ vi.mock("pptxgenjs", () => ({
 
 import { exportWeeklyPptx } from "./pptx";
 
-beforeEach(() => mocks.addTable.mockClear());
+beforeEach(() => {
+  mocks.addTable.mockClear();
+  mocks.addText.mockClear();
+});
 
-it("italicizes only unconfirmed values, including the displayed notes field", async () => {
+it("italicizes only unconfirmed values and renders AI-drafted note legend", async () => {
   const row: WeeklyRow = {
     id: "deal",
     vertical: "Food",
@@ -35,8 +38,8 @@ it("italicizes only unconfirmed values, including the displayed notes field", as
     buildingSf: 10,
     pricePerSf: 10,
     lotSf: 20,
-    notes: "Source note",
-    notesField: "notes",
+    notes: "Closing scheduled Nov 25",
+    notesField: "weekly_note",
     fieldProvenance: {
       market: "assumed",
       address: "confirmed",
@@ -44,8 +47,8 @@ it("italicizes only unconfirmed values, including the displayed notes field", as
       list_price: "confirmed",
       bldg_sf: "assumed",
       lot_sf: "confirmed",
-      notes: "assumed",
-      weekly_note: "confirmed",
+      notes: "confirmed",
+      weekly_note: "llm_suggested",
     },
     showInWeekly: true,
     needsReview: false,
@@ -64,4 +67,10 @@ it("italicizes only unconfirmed values, including the displayed notes field", as
   expect(cells.map((cell: { options?: { italic: boolean } }) => cell.options?.italic)).toEqual([
     true, false, true, false, true, undefined, false, true,
   ]);
+  expect(cells[7]).toMatchObject({
+    text: "● Closing scheduled Nov 25",
+    options: { italic: true, color: "7C3AED" },
+  });
+  const textCalls = mocks.addText.mock.calls.map((call) => String(call[0]));
+  expect(textCalls.some((text) => text.includes("AI-drafted note"))).toBe(true);
 });

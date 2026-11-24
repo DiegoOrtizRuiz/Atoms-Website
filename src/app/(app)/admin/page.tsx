@@ -57,7 +57,7 @@ export default async function AdminPage({
     supabase.from("deals").select("client").not("client", "is", null),
     supabase
       .from("deals")
-      .select("id, stage, needs_review, review_reasons, stage_raw, field_provenance, address"),
+      .select("id, stage, needs_review, review_reasons, stage_raw, field_provenance, address, weekly_note, notes_extracted, geocode_status, lat, lng, census_tract_geoid"),
     supabase.from("deals").select("vertical, attributes"),
     supabase.rpc("admin_logins_per_day", { days: 30 }),
     supabase

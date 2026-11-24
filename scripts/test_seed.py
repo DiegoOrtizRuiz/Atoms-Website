@@ -5,6 +5,7 @@ import pytest
 from seed import (
     STAGES,
     activity_rows,
+    build_enrichment_patches,
     demo_users,
     missing_vertical_configs,
     prepare_deals,
@@ -148,3 +149,31 @@ def test_invalid_stage_fails_loudly(deals):
 
     with pytest.raises(SystemExit, match="invalid stage"):
         prepare_deals(deals, datetime(2026, 11, 19, 12, tzinfo=UTC))
+
+
+def test_build_enrichment_patches_touches_only_suggestions_and_keeps_existing_provenance():
+    existing = [
+        {
+            "id": "av_clientC_atl:2",
+            "stage": "In Contract",
+            "list_price": 2850000,
+            "field_provenance": {"power_amps": "assumed"},
+        }
+    ]
+    enriched = [
+        {
+            "id": "av_clientC_atl:2",
+            "stage": "Closed",  # must NOT be copied into patch
+            "list_price": 1,  # must NOT be copied into patch
+            "notes_extracted": {"confidence": 0.9, "evidence": []},
+            "weekly_note": "DD 9/18; environmental review started",
+        }
+    ]
+    patches = build_enrichment_patches(enriched, existing)
+    assert len(patches) == 1
+    assert set(patches[0]) == {"id", "notes_extracted", "weekly_note", "field_provenance"}
+    assert patches[0]["field_provenance"] == {
+        "power_amps": "assumed",
+        "notes_extracted": "llm_suggested",
+        "weekly_note": "llm_suggested",
+    }

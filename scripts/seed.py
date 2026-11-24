@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import random
@@ -543,9 +544,119 @@ def reconcile(client: Client, expected: dict[str, int]) -> dict[str, int]:
     return actual
 
 
-def run() -> None:
+def build_enrichment_patches(
+    enriched_deals: list[dict[str, Any]],
+    existing_deals: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Build updates touching ONLY notes_extracted, weekly_note, and field_provenance."""
+    existing_by_id = {row["id"]: row for row in existing_deals}
+    patches: list[dict[str, Any]] = []
+    for source in enriched_deals:
+        deal_id = source.get("id")
+        if not deal_id or deal_id not in existing_by_id:
+            continue
+        if "notes_extracted" not in source and "weekly_note" not in source:
+            continue
+        existing = existing_by_id[deal_id]
+        provenance = dict(existing.get("field_provenance") or {})
+        if source.get("notes_extracted") is not None:
+            provenance["notes_extracted"] = "llm_suggested"
+        if source.get("weekly_note") is not None:
+            provenance["weekly_note"] = "llm_suggested"
+        patches.append(
+            {
+                "id": deal_id,
+                "notes_extracted": source.get("notes_extracted"),
+                "weekly_note": source.get("weekly_note"),
+                "field_provenance": provenance,
+            }
+        )
+    return patches
+
+
+def run_enrichment_only(client: Client) -> None:
+    enriched_path = DEFAULT_OUT_DIR / "deals_enriched.json"
+    if not enriched_path.exists():
+        raise SystemExit(
+            f"Enriched deals file not found: {enriched_path}. Run scripts/llm_enrich.py first."
+        )
+    enriched_deals = load_json(enriched_path)
+    before_rows = response_rows(client.table("deals").select("*").execute())
+    before_by_id = {row["id"]: row for row in before_rows}
+
+    patches = build_enrichment_patches(enriched_deals, before_rows)
+    for patch in patches:
+        deal_id = patch["id"]
+        response_rows(
+            client.table("deals")
+            .update(
+                {
+                    "notes_extracted": patch["notes_extracted"],
+                    "weekly_note": patch["weekly_note"],
+                    "field_provenance": patch["field_provenance"],
+                }
+            )
+            .eq("id", deal_id)
+            .execute()
+        )
+
+    after_rows = response_rows(client.table("deals").select("*").execute())
+    allowed_changed = {
+        "notes_extracted",
+        "weekly_note",
+        "field_provenance",
+        "version",
+        "updated_at",
+        "updated_by",
+    }
+    column_change_counts: Counter[str] = Counter()
+    unexpected_changes: list[str] = []
+    for after in after_rows:
+        before = before_by_id.get(after["id"])
+        if before is None:
+            unexpected_changes.append(f"unexpected new row {after['id']}")
+            continue
+        for col, new_val in after.items():
+            if before.get(col) != new_val:
+                column_change_counts[col] += 1
+                if col not in allowed_changed:
+                    unexpected_changes.append(f"{after['id']}.{col}")
+
+    if unexpected_changes:
+        raise RuntimeError(
+            f"--enrichment-only unexpectedly modified protected columns: {', '.join(unexpected_changes)}"
+        )
+
+    print("Enrichment-only seed reconciliation passed:")
+    print(f"  source: {enriched_path.relative_to(ROOT)}")
+    print(f"  deals patched: {len(patches)}")
+    print(f"  changed columns: {dict(column_change_counts)}")
+    print("  protected source columns changed: 0")
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Seed Site Pipeline into Supabase.")
+    parser.add_argument(
+        "--enrichment-only",
+        action="store_true",
+        help="Update only notes_extracted, weekly_note, and llm_suggested provenance on existing deals.",
+    )
+    return parser.parse_args(argv)
+
+
+def run(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     url = os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
     service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if args.enrichment_only:
+        if not url or not service_key:
+            raise SystemExit(
+                "Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY before seeding."
+            )
+        client = create_client(url, service_key)
+        run_enrichment_only(client)
+        return
+
     password = os.environ.get("DEMO_PASSWORD")
     if not url or not service_key or not password:
         raise SystemExit(

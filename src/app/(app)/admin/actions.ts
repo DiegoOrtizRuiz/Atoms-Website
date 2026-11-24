@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser, userRoles } from "@/lib/auth";
 import { authCallbackUrl } from "@/lib/auth-redirect";
+import { geocodeMissingDeals } from "@/lib/geo/service";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -27,7 +28,7 @@ const inviteSchema = z.object({
 
 const activityFilterSchema = z.object({
   userId: z.uuid().optional(),
-  event: z.enum(["login", "page_view", "deal_edit", "admin_change", "snapshot", "csv_export", "password_set", "config_change", "import"]).optional(),
+  event: z.enum(["login", "page_view", "deal_edit", "admin_change", "snapshot", "csv_export", "password_set", "config_change", "import", "ai_review"]).optional(),
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
   page: z.number().int().min(1).default(1),
@@ -386,4 +387,12 @@ export async function getAdminActivity(input: z.input<typeof activityFilterSchem
     })),
     count: count ?? 0,
   };
+}
+
+export async function geocodeMissingAdminDeals() {
+  await requireAdmin();
+  const summary = await geocodeMissingDeals({ retryErrors: true });
+  revalidatePath("/admin");
+  revalidatePath("/deals");
+  return summary;
 }
