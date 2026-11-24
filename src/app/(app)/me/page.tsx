@@ -59,6 +59,7 @@ export default async function MePage() {
       <PageHeader
         title="My profile"
         description="Review your account, permissions, and recent activity."
+        helpSection="your-role"
       />
       <MyProfile recent={recent} user={user} />
     </>

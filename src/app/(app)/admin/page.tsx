@@ -178,6 +178,7 @@ export default async function AdminPage({
       <PageHeader
         title="Administration"
         description="Manage access, review activity, and monitor pipeline health."
+        helpSection="admin"
       />
       <AdminWorkspace
         attributeValueCounts={attributeValueCounts}

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   ChartNoAxesCombined,
+  CircleHelp,
   LayoutDashboard,
   ShieldCheck,
   UserRound,
@@ -18,6 +19,7 @@ const links = [
   { href: "/rollup", label: "Rollup", icon: ChartNoAxesCombined },
   { href: "/me", label: "My profile", icon: UserRound },
   { href: "/admin", label: "Admin", icon: ShieldCheck, adminOnly: true },
+  { href: "/help", label: "Help", icon: CircleHelp },
 ] as const;
 
 export function AppNav({ role }: { role: UserRole }) {

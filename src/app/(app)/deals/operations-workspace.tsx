@@ -579,6 +579,7 @@ export function OperationsWorkspace({
       <PageHeader
         title="Operations"
         description="Filter, review, and edit every acquisition opportunity in one live pipeline."
+        helpSection={view === "map" ? "map" : "operations"}
       >
         <div className="flex items-center gap-3">
           {reviewCount ? (

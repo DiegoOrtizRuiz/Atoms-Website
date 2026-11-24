@@ -1,7 +1,7 @@
 "use client";
 
 import type { ICellRendererParams } from "ag-grid-community";
-import { Check, Ellipsis, Sparkles } from "lucide-react";
+import { Check, Ellipsis, Pencil, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -43,6 +43,7 @@ export function ProvenanceCell(
   const highlighted = status === "assumed" || status === "llm_suggested";
   const canEdit = canEditDeal(context.user, deal);
   const canConfirm = canConfirmDeal(context.user, deal);
+  const editable = props.column?.isCellEditable(props.node) ?? false;
 
   async function run(action: () => Promise<void>) {
     try {
@@ -75,6 +76,12 @@ export function ProvenanceCell(
       <span className="min-w-0 flex-1 truncate">
         {props.displayValue ?? props.valueFormatted ?? props.value ?? "—"}
       </span>
+      {editable ? (
+        <Pencil
+          aria-label="Editable"
+          className="size-3.5 shrink-0 text-slate-500 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+        />
+      ) : null}
       {canEdit || (highlighted && canConfirm) ? (
         <DropdownMenu>
           <DropdownMenuTrigger

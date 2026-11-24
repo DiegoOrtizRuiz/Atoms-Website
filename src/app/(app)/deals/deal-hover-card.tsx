@@ -67,7 +67,7 @@ export function DealHoverCard({
   const demo = formatTractDemographics(demographics);
 
   return (
-    <div className="w-[310px] space-y-3 text-left text-xs text-slate-800">
+    <div className="w-[310px] space-y-3 text-left text-xs text-slate-800" data-testid="deal-hover-card">
       <div className="space-y-1">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-semibold leading-snug text-slate-950">

@@ -95,6 +95,7 @@ export default async function RollupPage() {
       <PageHeader
         title="Stage rollup"
         description="Pipeline volume, time in stage, and contact outreach from the live dataset."
+        helpSection="rollup"
       />
       <div className="space-y-5 px-4 pb-8 md:px-8">
         <Card>

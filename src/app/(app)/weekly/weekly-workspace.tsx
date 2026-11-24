@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { HelpLink } from "@/components/help-link";
 import type { UserRole } from "@/lib/auth";
 import type { Json } from "@/lib/database.types";
 import { isUnconfirmed, type Deal, type DealHistory, type VerticalConfig } from "@/lib/deals";
@@ -360,10 +361,13 @@ export function WeeklyWorkspace({
                 {section?.vertical ?? "Weekly review"}
               </h1>
             </div>
-            <Button onClick={() => setPresentation(false)} size="lg" variant="outline">
-              <X className="size-4" />
-              Exit
-            </Button>
+            <div className="flex items-center gap-2">
+              <HelpLink section="weekly" />
+              <Button onClick={() => setPresentation(false)} size="lg" variant="outline">
+                <X className="size-4" />
+                Exit
+              </Button>
+            </div>
           </header>
           <div className="flex-1 rounded-2xl border bg-white p-1 shadow-xl">
             {section ? (
@@ -441,6 +445,7 @@ export function WeeklyWorkspace({
               <Maximize2 className="size-4" />
               Present
             </Button>
+            <HelpLink section="weekly" />
           </div>
         </div>
       </header>

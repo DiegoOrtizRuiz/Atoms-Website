@@ -45,6 +45,7 @@ After signing in, use the navigation on the left:
 - **Rollup** summarizes deal counts by vertical and stage, time spent in a
   stage, and contact outreach.
 - **My profile** shows your account role and recent activity.
+- **Help** provides a plain-English guide to the app.
 - **Admin** is visible only to administrators. It contains user management,
   activity, usage, and data-health information.
 
@@ -112,9 +113,7 @@ provider or API key.
 1. Sign in as `viewer@demo.test` and open **Operations**. Filter by a vertical
    or stage, then select a deal address to see its notes and history.
 2. Select the **Map** toggle. The map uses the same filters; when the map is
-   available, select a marker for site details. If the Google Maps key is not
-   configured, the page still shows the geocoded summary and **Not on map**
-   list.
+   available, select a marker for site details.
 3. Open **Weekly Review** and look for the Seattle closing date in **Needs
    attention this week**. Try **Present** and **Export PPTX**.
 4. Sign out and sign in as `leadership@demo.test`. Return to Weekly Review and
@@ -125,6 +124,8 @@ provider or API key.
    dry-run reconciliation. Do not select **Apply** during a review: this
    changes the shared live dataset. The other Admin tabs show users, activity,
    usage, and data health.
+
+For an in-app guide, open [Help](https://atoms-website-three.vercel.app/help).
 
 ### Helpful notes for reviewers
 
@@ -165,10 +166,15 @@ npm run build
 python -m pytest -q scripts
 ```
 
-Latest verified counts: **83 Vitest tests** across 21 files, **47 Python
+Latest verified counts: **85 Vitest tests** across 22 files, **47 Python
 tests**, and **16 production Playwright E2E tests**. The regular CI workflow
 runs the Python tests, Vitest, lint, typecheck, and build; E2E is run
 separately because it mutates shared test data and needs production credentials.
+
+To refresh the Help screenshots, start the app with demo data, set
+`E2E_PASSWORD` and the Supabase settings in your environment, then run
+`npm run e2e -- e2e/help-screenshots.spec.ts`. This captures the four images
+in `public/help/` without editing deals.
 
 ### Submission
 

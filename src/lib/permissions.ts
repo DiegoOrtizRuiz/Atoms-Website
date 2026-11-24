@@ -1,4 +1,4 @@
-import type { UserRole } from "@/lib/auth";
+import type { CurrentUser, UserRole } from "@/lib/auth";
 
 export const rolePermissions: Record<
   UserRole,
@@ -59,6 +59,29 @@ export function roleCanEditDeals(role: UserRole) {
 
 export function roleCanConfirmAssumptions(role: UserRole) {
   return rolePermissions[role].confirmAssumptions;
+}
+
+export function describeDealPermissions(user: CurrentUser) {
+  const permissions = rolePermissions[user.role];
+  const scope =
+    permissions.editDeals === "Assigned verticals"
+      ? user.verticals
+      : permissions.editDeals === "Assigned clients"
+        ? user.clients
+        : [];
+  const scopeLabel =
+    permissions.editDeals === "Assigned verticals" ? "verticals" : "clients";
+  const read = permissions.readDeals === "All" ? "view all deals" : "view deals";
+
+  if (permissions.editDeals === "All") return `You can ${read} and edit all deals.`;
+  if (permissions.editDeals === "None") return `You can ${read}, but you cannot edit deals.`;
+  if (!scope.length) {
+    return `You can ${read}, but you have no ${scopeLabel} assigned for editing.`;
+  }
+  const names = new Intl.ListFormat("en", { style: "long", type: "conjunction" }).format(scope);
+  return permissions.editDeals === "Assigned verticals"
+    ? `You can ${read} and edit deals in ${names}.`
+    : `You can ${read} and edit ${names} deals.`;
 }
 
 export const permissionColumns = [

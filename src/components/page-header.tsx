@@ -1,11 +1,15 @@
+import { HelpLink } from "@/components/help-link";
+
 export function PageHeader({
   title,
   description,
   children,
+  helpSection,
 }: {
   title: string;
   description: string;
   children?: React.ReactNode;
+  helpSection: string;
 }) {
   return (
     <header className="flex min-h-28 flex-col justify-between gap-5 border-b border-slate-200 bg-white px-6 py-6 sm:flex-row sm:items-center lg:px-10">
@@ -17,7 +21,10 @@ export function PageHeader({
           {description}
         </p>
       </div>
-      {children}
+      <div className="flex items-center gap-2">
+        {children}
+        <HelpLink section={helpSection} />
+      </div>
     </header>
   );
 }
